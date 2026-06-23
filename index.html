@@ -134,6 +134,23 @@
   .docnote{margin-top:12px;font-size:14px;color:var(--tx2);border-left:2px solid var(--acline);padding-left:11px;}
   .fleffect{font-size:14.5px;color:var(--tx);background:var(--bg2);border:1px solid var(--line);border-left:2px solid var(--cyan);border-radius:8px;padding:11px 14px;min-height:20px;line-height:1.5;}
   .fleffect b{color:var(--cyan);}
+  /* descriptor -> open file -> inode chain */
+  .fdc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;}
+  @media (max-width:760px){.fdc-grid{grid-template-columns:1fr;}}
+  .fdc-col{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px;min-width:0;}
+  .fdc-h{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2);margin-bottom:9px;display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+  .fdc-h small{font-size:10px;color:var(--tx3);letter-spacing:.02em;text-transform:none;}
+  .fdc-row{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:7px;padding:7px 9px;margin-bottom:6px;background:var(--surface);color:var(--tx);transition:opacity .15s ease,box-shadow .15s ease;}
+  .fdc-row .n{font-weight:700;color:var(--tx2);min-width:14px;}
+  .fdc-row .arr{color:var(--tx3);}
+  .fdc-row.std{opacity:.5;}
+  .fdc-row.live{cursor:pointer;}
+  .fdc-row.live:hover{border-color:var(--acline);}
+  .fdc-card{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:7px;padding:8px 10px;margin-bottom:6px;background:var(--surface);font-size:12.5px;color:var(--tx2);line-height:1.5;transition:opacity .15s ease,box-shadow .15s ease;}
+  .fdc-card .ttl{font-family:var(--mono);font-size:12px;color:var(--tx);display:block;margin-bottom:2px;}
+  .fdc-card b{color:var(--cyan);font-family:var(--mono);}
+  .fdc-grid.dimmed .fdc-row:not(.on),.fdc-grid.dimmed .fdc-card:not(.on){opacity:.3;}
+  .fdc-empty{font-size:12px;color:var(--tx3);font-style:italic;padding:5px 2px;}
   /* ===== LAB PANELS ===== */
   .sim{border:1px solid var(--line2);border-radius:14px;margin:20px 0;background:var(--surface);overflow:hidden;}
   .sim-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--line2);flex-wrap:wrap;}
@@ -500,6 +517,33 @@ Hello, World!
           <button class="btn sm cyan" onclick="flPreset('ex3')">Example 3 — the “50 not 90”</button></div>
       </div>
     </div>
+    <h3><span class="hx">fd</span>Where the descriptor number comes from</h3>
+    <p>A file descriptor is just a small integer: an <strong>index</strong> into a table the kernel keeps for your process. Three entries are filled before your code even runs — <code>0</code> standard input, <code>1</code> standard output, <code>2</code> standard error — so the first file you <code>open()</code> is handed descriptor <strong>3</strong>. The rule is exact: <code>open()</code> returns the <strong>lowest-numbered slot not currently in use</strong>. Close a descriptor and that number is free again for the next <code>open()</code>.</p>
+    <p>That number is the head of a chain through three tables the kernel maintains:</p>
+    <div class="tablewrap"><table><thead><tr><th style="width:27%">Table</th><th>What it holds</th></tr></thead><tbody>
+      <tr><td><strong>Descriptor table</strong><br><span class="muted" style="font-size:12.5px">one per process</span></td><td>Maps each descriptor number to one entry in the open file table. This is the table your integer indexes into.</td></tr>
+      <tr><td><strong>Open file table</strong><br><span class="muted" style="font-size:12.5px">system-wide</span></td><td>One entry per <code>open()</code> call. Records the access mode and the current <strong>offset</strong>, the byte position where the next <code>read</code> or <code>write</code> lands, and points to an inode.</td></tr>
+      <tr><td><strong>Inode table</strong><br><span class="muted" style="font-size:12.5px">one per real file</span></td><td>One entry per actual file. Holds the file's size, permissions, and the location of its data blocks on disk. Open the same file twice and both open-file entries point to this single inode.</td></tr>
+    </tbody></table></div>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Build it</span> From descriptor to inode</div><button class="btn ghost sm" onclick="fdcReset()">Reset</button></div>
+      <div class="sim-body">
+        <p class="muted" style="margin:0 0 9px;font-size:13.5px">Open a few files and watch each descriptor link through to an inode. Open the same file twice to see two descriptors share one inode with independent offsets. Click any descriptor to trace its chain.</p>
+        <div class="sim-controls">
+          <button class="btn sm" onclick="fdcOpen('notes.txt')">open("notes.txt")</button>
+          <button class="btn sm" onclick="fdcOpen('data.bin')">open("data.bin")</button>
+          <button class="btn sm cyan" onclick="fdcOpen('notes.txt')">open("notes.txt") again</button>
+          <span style="color:var(--tx2);font-size:13px">close(</span><select class="field" id="fdcSel" style="width:64px"></select><span style="color:var(--tx2);font-size:13px">)</span><button class="btn ghost sm" onclick="fdcClose()">close</button>
+        </div>
+        <div class="fdc-grid" id="fdcGrid">
+          <div class="fdc-col"><div class="fdc-h">Descriptor table <small>per process</small></div><div id="fdcFd"></div></div>
+          <div class="fdc-col"><div class="fdc-h">Open file table <small>system-wide</small></div><div id="fdcOft"></div></div>
+          <div class="fdc-col"><div class="fdc-h">Inode table <small>one per file</small></div><div id="fdcIno"></div></div>
+        </div>
+        <div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin:14px 0 5px">What just happened</div>
+        <div class="fleffect" id="fdcEffect"></div>
+      </div>
+    </div>
     <h3><span class="hx">+</span><code>open()</code> flags — click each</h3>
     <p><code>open()</code> returns a non-negative <strong>file descriptor</strong> on success (<span class="ret pos">&ge; 0</span>) or <span class="ret neg">-1</span> on failure. The <code>flags</code> argument is one <em>access mode</em> combined with any <em>options</em> using the bitwise OR (<code>|</code>). Select a flag to see exactly what it does:</p>
     <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Explore</span> The <code style="background:none;color:inherit;border:0;padding:0">open()</code> flags</div></div>
@@ -522,6 +566,45 @@ int close(int file_descriptor);</code></pre></div>
       <tr><td><code>lseek(fd, -5, SEEK_CUR)</code></td><td>Move 5 bytes <strong>back</strong> from current</td></tr>
       <tr><td><code>lseek(fd, -5, SEEK_END)</code></td><td>Move to 5 bytes back <strong>from the end</strong></td></tr>
     </tbody></table></div>
+    <h3><span class="hx">{ }</span>Two complete programs</h3>
+    <p>The lab above generates one line of C per click. Here are two full programs you can compile and run as they are. Read them top to bottom and track the descriptor and the offset as each call executes.</p>
+    <p class="muted" style="font-size:13.5px;margin:0 0 7px"><strong>1. Create a file and write to it.</strong> The simplest case: open with <code>O_CREAT</code>, write a string, close.</p>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">#include &lt;fcntl.h&gt;     /* open, O_WRONLY, O_CREAT */
+#include &lt;unistd.h&gt;    /* write, close            */
+#include &lt;string.h&gt;    /* strlen                  */
+#include &lt;stdio.h&gt;
+
+int main() {
+    char *msg = "Hello, file!\n";
+    int fd = open("greeting.txt", O_WRONLY | O_CREAT, 0644);  /* fd is 3 */
+    if (fd &lt; 0) { perror("open"); return 1; }
+    write(fd, msg, strlen(msg));   /* 13 bytes, written at offset 0 */
+    close(fd);                     /* descriptor 3 is free again    */
+    return 0;
+}</code></pre></div>
+    <p class="muted" style="font-size:13px;margin:6px 0 16px">Descriptors 0, 1 and 2 are already taken by the standard streams, so <code>open()</code> returns <strong>3</strong>. <code>O_CREAT</code> makes the third argument <code>0644</code> required: it sets the new file's permissions.</p>
+    <p class="muted" style="font-size:13.5px;margin:0 0 7px"><strong>2. Write, rewind, and read it back.</strong> All five calls in one round trip, using one read/write descriptor.</p>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">#include &lt;stdio.h&gt;
+#include &lt;fcntl.h&gt;    /* open, O_RDWR             */
+#include &lt;unistd.h&gt;   /* read, write, lseek, close */
+
+int main() {
+    int fd;
+    char buffer[80];
+    static char message[] = "Hello, world";   /* 13 bytes incl. the '\0' */
+
+    fd = open("myfile", O_RDWR);               /* fd is 3 */
+    if (fd != -1) {
+        printf("myfile opened for read/write access\n");
+        write(fd, message, sizeof(message));   /* offset 0 -> 13 */
+        lseek(fd, 0, SEEK_SET);                /* rewind the offset to 0 */
+        read(fd, buffer, sizeof(message));     /* read the 13 bytes back */
+        printf(" %s was written to myfile \n", buffer);
+        close(fd);
+    }
+    return 0;
+}</code></pre></div>
+    <p class="muted" style="font-size:13px;margin:6px 0 0">After <code>write</code>, the offset sits at byte 13, so a <code>read</code> there would return nothing. <code>lseek(fd, 0, SEEK_SET)</code> moves it back to the start so the same bytes can be read into <code>buffer</code>. Run this round trip step by step in the <a href="#" onclick="go(4);setTimeout(function(){flPreset('together');},420);return false;">File descriptor lab</a> above.</p>
   </section>
 
   <!-- 5 PROCESSES: FORK -->
@@ -960,7 +1043,7 @@ close(fd);</code></pre></div>
     nvChips();nvReset();
     termChips();buildProgLoader("hello");codeReset();buildErrExplorer();buildPf();
     scReset();buildCallExplorer();ukReset();buildFlagExplorer();var sp=el("scPick");if(sp&&!sp._b){sp._b=1;sp.addEventListener("change",scReset);}
-    flReset();permReset();
+    flReset();fdcReset();permReset();
     peReset();frRole("parent");buildFpsPresets();fpsReset();memReset();el("rcOut").innerHTML='<span class="dim">// press Run the program</span>';psReset();buildExecExplorer();
     var fc=el("fpsCode");if(fc&&!fc._b){fc._b=1;fc.addEventListener("input",fpsReset);}
     ex1Reset();ex4Reset();t2Reset();t5Reset();orpReset();
@@ -1044,6 +1127,40 @@ close(fd);</code></pre></div>
     else if(w==="ex2"){FL.flags={O_WRONLY:true,O_CREAT:true};buildFlFlags();var s="The quick brown fox jumps over the lazy dog.\n";flPlay([function(){flOpen();},function(){el("flStr").value=s;flWrite(s);},function(){flClose();}]);}
     else if(w==="ex3"){FL.flags={O_WRONLY:true,O_CREAT:true};buildFlFlags();var t="The quick brown fox jumps over the lazy dog.\n";flPlay([function(){flOpen();},function(){el("flStr").value=t;flWrite(t);flLog("ok","1st write → 45 bytes (0..44)");},function(){el("flN").value="5";el("flWhence").value="SET";flSeek();},function(){el("flStr").value=t;flWrite(t);flLog("ok","2nd write → overwrites 5..44, extends to 49");},function(){flClose();flLog("mv","► final size = "+FL.bytes.length+" bytes (not 90)");}]);}}
   function flPlay(steps){var t=300;steps.forEach(function(fn){setTimeout(fn,t);t+=1050;});}
+
+  /* ===== S4b: descriptor -> open file table -> inode chain ===== */
+  var FDC;
+  var FDC_HUES=["var(--ac)","var(--cyan)","var(--cfn)","var(--green)","var(--cpre)","var(--amber)"];
+  function fdcReset(){FDC={open:{},sel:null,hue:0};fdcRender();el("fdcEffect").innerHTML='<span style="color:var(--tx3)">Descriptors <b style="color:var(--tx2)">0</b>, <b style="color:var(--tx2)">1</b> and <b style="color:var(--tx2)">2</b> are already open (stdin, stdout, stderr). Press an <b style="color:var(--tx2)">open()</b> button to claim the next free number.</span>';}
+  function fdcFds(){return Object.keys(FDC.open).map(Number).sort(function(a,b){return a-b;});}
+  function fdcLowest(){var n=3;while(FDC.open[n])n++;return n;}
+  function fdcInodes(){var order=[];fdcFds().forEach(function(fd){var nm=FDC.open[fd].name;if(order.indexOf(nm)<0)order.push(nm);});return order;}
+  function fdcInodeNo(name){return fdcInodes().indexOf(name)+1;}
+  function fdcRefs(name){return fdcFds().filter(function(fd){return FDC.open[fd].name===name;}).length;}
+  function fdcOpen(name){var fd=fdcLowest();var hue=FDC_HUES[FDC.hue++%FDC_HUES.length];var existed=fdcInodes().indexOf(name)>=0;FDC.open[fd]={name:name,mode:"O_RDONLY",offset:0,hue:hue};FDC.sel=fd;fdcRender();var ino=fdcInodeNo(name);
+    if(existed)el("fdcEffect").innerHTML='<b>open("'+name+'")</b> returned descriptor <b>'+fd+'</b>, again the lowest free number. It gets its <b>own</b> open-file entry with its <b>own</b> offset (0), but it points to the <b>same inode (#'+ino+')</b> as the earlier descriptor. The two descriptors now read '+name+' independently.';
+    else el("fdcEffect").innerHTML='<b>open("'+name+'")</b> scanned the descriptor table for the lowest free slot. 0, 1 and 2 are taken by the standard streams, so it returned <b>'+fd+'</b>. A new open-file entry (offset 0, O_RDONLY) was created, pointing to a fresh inode (<b>#'+ino+'</b>) for '+name+'.';}
+  function fdcClose(){var v=el("fdcSel").value;if(!v){el("fdcEffect").innerHTML="No open descriptor to close — open a file first.";return;}var fd=Number(v),nm=FDC.open[fd].name;delete FDC.open[fd];if(FDC.sel===fd)FDC.sel=null;fdcRender();var gone=fdcInodes().indexOf(nm)<0;el("fdcEffect").innerHTML='<b>close('+fd+')</b> freed descriptor <b>'+fd+'</b> and removed its open-file entry. '+(gone?'No descriptor refers to '+nm+' any more, so its inode entry is released too.':'Other descriptors still point to '+nm+'&rsquo;s inode, so the inode stays.')+' The number <b>'+fd+'</b> is now free, and the next <code>open()</code> will reuse it.';}
+  function fdcSelect(fd){if(FDC.sel===fd){FDC.sel=null;fdcRender();el("fdcEffect").innerHTML='<span style="color:var(--tx3)">Selection cleared. Click any descriptor to trace its chain.</span>';return;}FDC.sel=fd;fdcRender();var o=FDC.open[fd];el("fdcEffect").innerHTML='Following descriptor <b>'+fd+'</b>: the descriptor table sends it to its open-file entry (mode '+o.mode+', offset <b>'+o.offset+'</b>), which points to <b>inode #'+fdcInodeNo(o.name)+'</b> for '+o.name+'. Every <code>read</code> or <code>write</code> on fd '+fd+' follows exactly this path.';}
+  function fdcRender(){
+    var std=[[0,"stdin","keyboard"],[1,"stdout","screen"],[2,"stderr","screen"]],fdh="";
+    std.forEach(function(s){fdh+='<div class="fdc-row std"><span class="n">'+s[0]+'</span><span class="arr">&rarr;</span><span>'+s[1]+' <span style="color:var(--tx3)">('+s[2]+')</span></span></div>';});
+    fdcFds().forEach(function(fd){var o=FDC.open[fd];fdh+='<div class="fdc-row live" data-fd="'+fd+'" style="border-left-color:'+o.hue+'"><span class="n" style="color:'+o.hue+'">'+fd+'</span><span class="arr">&rarr;</span><span>'+o.name+'</span></div>';});
+    el("fdcFd").innerHTML=fdh;
+    var ofth="";fdcFds().forEach(function(fd){var o=FDC.open[fd];ofth+='<div class="fdc-card" data-fd="'+fd+'" style="border-left-color:'+o.hue+'"><span class="ttl">entry for fd '+fd+'</span>mode '+o.mode+' &middot; offset <b>'+o.offset+'</b><br>&rarr; inode #'+fdcInodeNo(o.name)+' ('+o.name+')</div>';});
+    el("fdcOft").innerHTML=ofth||'<div class="fdc-empty">no files open</div>';
+    var inoh="";fdcInodes().forEach(function(nm){inoh+='<div class="fdc-card" data-ino="'+nm+'"><span class="ttl">inode #'+fdcInodeNo(nm)+' &middot; '+nm+'</span>perms 0644 &middot; refs <b>'+fdcRefs(nm)+'</b><br>data blocks on disk</div>';});
+    el("fdcIno").innerHTML=inoh||'<div class="fdc-empty">no inodes active</div>';
+    var sel=el("fdcSel"),cur=fdcFds();sel.innerHTML=cur.length?cur.map(function(fd){return '<option value="'+fd+'">'+fd+'</option>';}).join(""):'<option value="">&mdash;</option>';
+    el("fdcFd").querySelectorAll(".fdc-row.live").forEach(function(r){r.onclick=function(){fdcSelect(Number(r.dataset.fd));};});
+    fdcApplySel();
+  }
+  function fdcApplySel(){var grid=el("fdcGrid"),fd=FDC.sel;
+    document.querySelectorAll("#fdcFd .fdc-row,#fdcOft .fdc-card,#fdcIno .fdc-card").forEach(function(n){n.classList.remove("on");n.style.boxShadow="";});
+    if(fd==null||!FDC.open[fd]){grid.classList.remove("dimmed");return;}
+    grid.classList.add("dimmed");var hue=FDC.open[fd].hue,nm=FDC.open[fd].name;
+    [el("fdcFd").querySelector('.fdc-row[data-fd="'+fd+'"]'),el("fdcOft").querySelector('.fdc-card[data-fd="'+fd+'"]'),el("fdcIno").querySelector('.fdc-card[data-ino="'+nm+'"]')].forEach(function(n){if(n){n.classList.add("on");n.style.boxShadow="0 0 0 1px "+hue;}});
+  }
   var PERM;
   function permReset(){PERM={owner:{r:1,w:1,x:0},group:{r:0,w:0,x:0},other:{r:0,w:0,x:0}};permRender();}
   function permRender(){var g=el("permGrid");g.innerHTML="";var hdr=["","r","w","x"];hdr.forEach(function(h){var d=document.createElement("div");d.className="pl";d.style.textAlign="center";d.textContent=h;g.appendChild(d);});
@@ -1143,6 +1260,7 @@ close(fd);</code></pre></div>
   window.orpReset=orpReset;window.orpStep=orpStep;
   window.scStep=scStep;window.scReset=scReset;window.ukReset=ukReset;
   window.flReset=flReset;window.flOpen=flOpen;window.flWrite=flWrite;window.flSeek=flSeek;window.flRead=flRead;window.flClose=flClose;window.flPreset=flPreset;
+  window.fdcReset=fdcReset;window.fdcOpen=fdcOpen;window.fdcClose=fdcClose;
   initAll();
 </script>
 </body>
