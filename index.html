@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CSE321 — Lab 01: System Calls &amp; Process Creation</title>
+<style>
+  :root{
+    --bg:#0a0c12; --bg2:#0c0f16; --surface:#11141d; --surface2:#161b26; --surface3:#1c2230;
+    --line:#232a38; --line2:rgba(255,255,255,.07); --line3:rgba(255,255,255,.04);
+    --tx:#e7eaf1; --tx2:#9aa3b4; --tx3:#646d7e; --ink:#0a0c12;
+    --ac:#7c83ff; --ac2:#9ea3ff; --acdim:rgba(124,131,255,.13); --acline:rgba(124,131,255,.34);
+    --green:#3fb950; --greend:rgba(63,185,80,.13); --greenl:rgba(63,185,80,.38);
+    --amber:#d29922; --amberd:rgba(210,153,34,.13); --amberl:rgba(210,153,34,.4);
+    --red:#f85149; --redd:rgba(248,81,73,.13); --redl:rgba(248,81,73,.4);
+    --cyan:#39d0d8; --cyand:rgba(57,208,216,.12); --cyanl:rgba(57,208,216,.4);
+    --cstr:#9ece6a; --ckw:#7c83ff; --cfn:#e0af68; --cnum:#ff9e64; --cpre:#bb9af7; --ccom:#5c6678;
+    --mono:"SFMono-Regular","SF Mono","Cascadia Code","JetBrains Mono","Fira Code",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --sh:0 2px 6px rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.45);
+    --glow:0 0 0 1px var(--acline),0 8px 34px rgba(124,131,255,.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:var(--sans);color:var(--tx);font-size:18px;line-height:1.65;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;padding-bottom:92px;
+    background:
+      radial-gradient(900px 500px at 88% -8%,rgba(124,131,255,.07),transparent 60%),
+      radial-gradient(700px 420px at -6% 4%,rgba(57,208,216,.045),transparent 55%),
+      var(--bg);}
+  ::selection{background:rgba(124,131,255,.32);color:#fff;}
+  a{color:var(--ac2);text-decoration:none;} a:hover{text-decoration:underline;}
+  /* topbar */
+  .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px clamp(16px,4vw,40px);
+    background:rgba(10,12,18,.78);backdrop-filter:saturate(150%) blur(14px);-webkit-backdrop-filter:saturate(150%) blur(14px);border-bottom:1px solid var(--line2);}
+  .brand{display:flex;align-items:center;gap:13px;}
+  .logo{width:38px;height:38px;border-radius:9px;flex:0 0 auto;background:var(--surface2);border:1px solid var(--line);display:grid;place-items:center;color:var(--ac);font-family:var(--mono);font-weight:700;font-size:15px;}
+  .brand .c1{font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);}
+  .brand .c2{font-size:18px;font-weight:680;letter-spacing:-.01em;line-height:1.15;}
+  .topbar .meta{display:flex;align-items:center;gap:16px;flex-shrink:0;}
+  .dots3{display:flex;gap:6px;align-items:center;}
+  .dots3 i{width:11px;height:11px;border-radius:50%;display:block;} .dots3 .r{background:#ff5f57;} .dots3 .y{background:#febc2e;} .dots3 .g{background:#28c840;}
+  .ring{position:relative;width:44px;height:44px;} .ring svg{transform:rotate(-90deg);} .ring .rt{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ac2);}
+  .kbd-hint{font-family:var(--mono);font-size:11px;color:var(--tx3);text-align:right;line-height:1.5;}
+  kbd,.kbd{font-family:var(--mono);font-size:10.5px;background:var(--surface2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--tx2);}
+  .progress{height:2px;background:var(--line);position:sticky;top:65px;z-index:49;} .progress .bar{height:100%;width:10%;background:var(--ac);box-shadow:0 0 12px var(--ac);transition:width .4s cubic-bezier(.4,0,.2,1);}
+  .pills{position:sticky;top:67px;z-index:48;display:flex;gap:7px;overflow-x:auto;scrollbar-width:thin;padding:9px clamp(16px,4vw,40px);background:rgba(10,12,18,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line2);}
+  .pills::-webkit-scrollbar{height:5px;} .pills::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px;}
+  .pill{flex:0 0 auto;font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--tx2);background:transparent;border:1px solid var(--line);padding:6px 13px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:all .14s ease;}
+  .pill:hover{color:var(--ac2);border-color:var(--acline);background:var(--acdim);}
+  .pill.active{color:var(--ink);background:var(--ac);border-color:var(--ac);}
+  .pill .num{opacity:.55;margin-right:7px;} .pill.active .num{opacity:.8;color:var(--ink);}
+  main{max-width:1060px;margin:0 auto;padding:clamp(22px,3vw,40px) clamp(16px,4vw,30px) 36px;}
+  .slide{display:none;} .slide.active{display:block;animation:slidein .42s cubic-bezier(.22,.61,.36,1);}
+  @keyframes slidein{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+  @keyframes fade{from{opacity:0;}to{opacity:1;}}
+  @keyframes pop{0%{opacity:0;transform:scale(.5);}60%{transform:scale(1.07);}100%{opacity:1;transform:scale(1);}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.05ms!important;}}
+  /* type */
+  .eyebrow{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ac);margin-bottom:12px;display:flex;align-items:center;gap:9px;}
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--ac);opacity:.6;}
+  h1.title{font-size:clamp(34px,6vw,56px);line-height:1.04;letter-spacing:-.03em;margin:0 0 16px;font-weight:760;}
+  h2{font-size:clamp(27px,4vw,38px);line-height:1.1;letter-spacing:-.025em;margin:0 0 8px;font-weight:720;}
+  .sub{font-size:clamp(16px,2.2vw,20px);color:var(--tx2);margin:0 0 22px;max-width:76ch;line-height:1.6;}
+  h3{font-size:22px;margin:36px 0 12px;font-weight:680;letter-spacing:-.015em;display:flex;align-items:center;gap:12px;padding-bottom:11px;border-bottom:1px solid var(--line2);}
+  h3 .hx{width:27px;height:27px;border-radius:7px;background:var(--surface2);border:1px solid var(--line);color:var(--ac);display:inline-grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:700;flex:0 0 auto;}
+  h3 code,h2 code,h4 code{font-family:var(--mono);font-size:.88em;background:var(--acdim);color:var(--ac2);padding:2px 8px;border-radius:6px;font-weight:600;border:1px solid var(--acline);}
+  h4{font-size:17px;margin:22px 0 8px;font-weight:680;}
+  p{margin:11px 0;} .lead{font-size:20px;color:var(--tx);} strong{font-weight:680;color:#f1f3f8;} .muted{color:var(--tx2);}
+  ul,ol{margin:12px 0;padding-left:24px;} li{margin:7px 0;} li::marker{color:var(--ac);}
+  :not(pre)>code{font-family:var(--mono);font-size:.86em;background:var(--surface2);color:var(--ac2);padding:2px 6px;border-radius:5px;border:1px solid var(--line);white-space:nowrap;}
+  .card{background:var(--surface);border:1px solid var(--line2);border-radius:13px;padding:22px 24px;margin:18px 0;}
+  .grid{display:grid;gap:14px;} .grid.c2{grid-template-columns:1fr 1fr;} .grid.c3{grid-template-columns:repeat(3,1fr);}
+  @media (max-width:820px){.grid.c2,.grid.c3{grid-template-columns:1fr;}}
+  .agenda{counter-reset:ag;list-style:none;padding:0;margin:0;}
+  .agenda li{counter-increment:ag;display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line3);}
+  .agenda li:last-child{border-bottom:0;}
+  .agenda li::before{content:counter(ag,decimal-leading-zero);font-family:var(--mono);font-weight:600;color:var(--ac);font-size:12.5px;min-width:30px;}
+  .note{border:1px solid var(--line2);border-left:2px solid var(--ac);background:var(--acdim);border-radius:0 10px 10px 0;padding:13px 18px;margin:16px 0;font-size:16px;}
+  .note.warn{border-left-color:var(--amber);background:var(--amberd);} .note.ok{border-left-color:var(--green);background:var(--greend);}
+  .note .h{font-weight:680;display:block;margin-bottom:2px;color:var(--ac2);} .note.warn .h{color:var(--amber);} .note.ok .h{color:var(--green);}
+  /* tables */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line2);border-radius:11px;margin:16px 0;}
+  table{border-collapse:collapse;width:100%;font-size:15.5px;}
+  th,td{text-align:left;padding:10px 15px;border-bottom:1px solid var(--line3);vertical-align:top;}
+  thead th{background:var(--surface2);font-family:var(--mono);font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2);}
+  tbody tr:last-child td{border-bottom:0;} tbody tr:hover{background:var(--surface);}
+  td code,th code{font-family:var(--mono);font-size:.9em;background:var(--surface2);color:var(--ac2);padding:1px 6px;border-radius:5px;white-space:nowrap;}
+  /* code */
+  .code{background:var(--bg2);border-radius:11px;margin:16px 0;overflow:hidden;border:1px solid var(--line);}
+  .code .chead{display:flex;align-items:center;justify-content:space-between;background:var(--surface);padding:8px 12px 8px 15px;border-bottom:1px solid var(--line);}
+  .code .lang{font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--tx3);}
+  .code .lang .dot{color:var(--ac);margin-right:7px;}
+  .copybtn{font-family:var(--mono);font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:var(--tx2);border:1px solid var(--line);padding:4px 11px;border-radius:6px;transition:all .14s ease;}
+  .copybtn:hover{color:var(--ac2);border-color:var(--acline);background:var(--acdim);} .copybtn.ok{color:var(--green);border-color:var(--greenl);background:var(--greend);}
+  pre{margin:0;overflow-x:auto;} pre code{display:block;font-family:var(--mono);font-size:14px;line-height:1.62;color:#cdd3df;padding:15px 17px;white-space:pre;tab-size:4;}
+  pre::-webkit-scrollbar{height:8px;} pre::-webkit-scrollbar-thumb{background:#2a3344;border-radius:8px;}
+  .c-com{color:var(--ccom);font-style:italic;} .c-str{color:var(--cstr);} .c-kw{color:var(--ckw);} .c-fn{color:var(--cfn);} .c-num{color:var(--cnum);} .c-pre{color:var(--cpre);}
+  /* hints */
+  .hints{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px;}
+  .hint-body{display:none;margin-top:11px;padding:13px 16px;border-radius:9px;background:var(--surface);border:1px solid var(--line2);border-left:2px solid var(--amber);font-size:15.5px;}
+  .hint-body.show{display:block;animation:fade .25s ease;}
+  .hint-body .hl{font-weight:680;color:var(--amber);display:block;margin-bottom:3px;font-family:var(--mono);font-size:13px;letter-spacing:.03em;}
+  .reveal-btn{font-family:var(--mono);font-size:13px;font-weight:600;cursor:pointer;padding:6px 14px;border-radius:7px;transition:all .14s ease;display:inline-flex;align-items:center;gap:7px;background:transparent;color:var(--amber);border:1px solid var(--amberl);}
+  .reveal-btn::before{content:"+";font-weight:700;} .reveal-btn.active::before{content:"\2212";} .reveal-btn:hover{background:var(--amberd);}
+  .reveal-btn.ac{color:var(--ac2);border-color:var(--acline);} .reveal-btn.ac:hover{background:var(--acdim);}
+  .problem-stmt{background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:14px 18px;margin:12px 0;font-size:16px;}
+  .problem-stmt .pl{font-weight:680;color:var(--ac2);font-family:var(--mono);font-size:13px;}
+  /* diagrams */
+  .diagram{background:var(--surface);border:1px solid var(--line2);border-radius:13px;padding:16px;margin:18px 0;overflow-x:auto;}
+  .diagram svg{display:block;margin:0 auto;max-width:100%;height:auto;}
+  .caption{font-size:14px;color:var(--tx2);text-align:center;margin:10px 6px 2px;line-height:1.5;}
+  .node-box{fill:var(--surface2);stroke:var(--line);} .node-int text{fill:var(--tx);}
+  .node-leaf .node-box{fill:var(--ac);stroke:var(--ac2);} .node-leaf text{fill:var(--ink);font-weight:700;}
+  .edge{stroke:#323b4d;stroke-width:1.6;fill:none;} .nlabel{font-family:var(--sans);font-size:12.5px;font-weight:600;} .nsub{font-family:var(--mono);font-size:10.5px;}
+  .forklabel{font-family:var(--mono);font-weight:600;}
+  /* system-call mechanism */
+  .scbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;}
+  .scmode{font-family:var(--mono);font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:8px;border:1px solid;transition:all .3s ease;}
+  .scmode.user{color:var(--cyan);background:var(--cyand);border-color:var(--cyanl);}
+  .scmode.kernel{color:var(--ac2);background:var(--acdim);border-color:var(--acline);}
+  .scregs{font-family:var(--mono);font-size:12px;color:var(--tx2);background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:6px 13px;}
+  .scregs b{color:var(--cfn);font-weight:700;}
+  #scSvg .scbox rect{transition:stroke .3s ease,filter .3s ease;}
+  #scSvg .scbox.on rect{stroke:var(--ac);stroke-width:2;filter:drop-shadow(0 0 7px rgba(124,131,255,.7));}
+  #scSvg .scbox.ondev.on rect{stroke:var(--cyan);filter:drop-shadow(0 0 7px rgba(57,208,216,.7));}
+  #scPacket{transition:transform .55s cubic-bezier(.4,0,.2,1),opacity .3s ease;}
+  /* syscall documentation panel */
+  .docsig{font-family:var(--mono);font-size:13px;color:var(--cfn);background:var(--bg2);border:1px solid var(--line);border-radius:7px;padding:9px 12px;margin-bottom:8px;overflow-x:auto;white-space:pre;}
+  .docmeta{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ac2);}
+  .docrow{margin:11px 0 0;}
+  .dk{display:block;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);margin-bottom:4px;}
+  .dv{font-size:14.5px;}
+  .doclist{margin:0;padding-left:20px;} .doclist li{margin:4px 0;font-size:14.5px;}
+  .docnote{margin-top:12px;font-size:14px;color:var(--tx2);border-left:2px solid var(--acline);padding-left:11px;}
+  /* ===== LAB PANELS ===== */
+  .sim{border:1px solid var(--line2);border-radius:14px;margin:20px 0;background:var(--surface);overflow:hidden;}
+  .sim-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--line2);flex-wrap:wrap;}
+  .sim-title{font-weight:640;font-size:15.5px;display:flex;align-items:center;gap:10px;}
+  .sim-title .tagi{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ac);background:var(--acdim);border:1px solid var(--acline);padding:3px 8px;border-radius:5px;}
+  .sim-body{padding:18px;}
+  .sim-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px;}
+  .btn{font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;padding:8px 15px;border-radius:8px;border:1px solid var(--ac);background:var(--ac);color:var(--ink);transition:all .14s ease;display:inline-flex;align-items:center;gap:7px;}
+  .btn:hover:not(:disabled){background:var(--ac2);box-shadow:0 4px 16px rgba(124,131,255,.32);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn.ghost{background:transparent;color:var(--tx);border-color:var(--line);} .btn.ghost:hover:not(:disabled){border-color:var(--acline);color:var(--ac2);background:var(--acdim);box-shadow:none;}
+  .btn.cyan{background:var(--cyand);color:var(--cyan);border-color:var(--cyanl);} .btn.cyan:hover:not(:disabled){background:rgba(57,208,216,.2);box-shadow:none;}
+  .btn.warn{background:var(--amberd);color:var(--amber);border-color:var(--amberl);} .btn.warn:hover:not(:disabled){background:rgba(210,153,34,.22);box-shadow:none;}
+  .btn.danger{background:var(--redd);color:var(--red);border-color:var(--redl);} .btn.danger:hover:not(:disabled){background:rgba(248,81,73,.22);box-shadow:none;}
+  .btn.sm{font-size:12.5px;padding:6px 11px;}
+  .field{font-family:var(--mono);font-size:13.5px;padding:7px 10px;border-radius:7px;border:1px solid var(--line);background:var(--bg2);color:var(--tx);}
+  .field:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px var(--acdim);}
+  input.field{width:70px;} input.field.wide{width:230px;max-width:52vw;}
+  select.field{cursor:pointer;}
+  .stat{display:inline-flex;flex-direction:column;gap:2px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:9px 15px;min-width:82px;}
+  .stat .sv{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--ac2);line-height:1;} .stat .sl{font-size:11px;color:var(--tx3);font-weight:500;letter-spacing:.02em;}
+  .stat.cyan .sv{color:var(--cyan);} .stat.amber .sv{color:var(--amber);} .stat.green .sv{color:var(--green);} .stat.red .sv{color:var(--red);}
+  .statrow{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px;}
+  /* editor + terminal */
+  .editor{border-radius:10px 10px 0 0;overflow:hidden;border:1px solid var(--line);border-bottom:0;}
+  .ed-bar{display:flex;align-items:center;gap:10px;padding:8px 13px;background:var(--surface2);border-bottom:1px solid var(--line);}
+  .ed-bar .fn{font-family:var(--mono);font-size:12.5px;color:var(--tx);font-weight:600;} .ed-bar .badge{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--green);background:var(--greend);padding:2px 7px;border-radius:4px;border:1px solid var(--greenl);}
+  textarea.ceditor{display:block;width:100%;min-height:178px;resize:vertical;font-family:var(--mono);font-size:14px;line-height:1.6;color:#cdd3df;background:var(--bg2);border:0;padding:13px 15px;tab-size:4;}
+  textarea.ceditor:focus{outline:none;}
+  .terminal{background:#080a0f;border-radius:0 0 10px 10px;overflow:hidden;border:1px solid var(--line);}
+  .terminal.solo{border-radius:10px;}
+  .term-bar{display:flex;align-items:center;gap:7px;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--line);}
+  .term-bar .tt{margin-left:6px;font-family:var(--mono);font-size:11.5px;color:var(--tx3);}
+  .term-out{font-family:var(--mono);font-size:13.5px;line-height:1.55;color:#cdd3df;padding:13px 15px;min-height:120px;max-height:280px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;}
+  .term-out .pr{color:#6ee7a8;} .term-out .cm{color:#fff;} .term-out .er{color:#ff8f8f;} .term-out .wr{color:#ffcf8f;} .term-out .dim{color:var(--tx3);} .term-out .ac{color:var(--ac2);}
+  .term-in{display:flex;align-items:center;gap:8px;padding:9px 13px;border-top:1px solid var(--line);background:#080a0f;}
+  .term-in .ps{font-family:var(--mono);font-size:13.5px;color:#6ee7a8;} .term-in input{flex:1;background:transparent;border:0;color:#fff;font-family:var(--mono);font-size:13.5px;} .term-in input:focus{outline:none;}
+  .chiprow{display:flex;flex-wrap:wrap;gap:7px;}
+  .cmdchip{font-family:var(--mono);font-size:12.5px;font-weight:500;cursor:pointer;background:var(--surface2);color:var(--ac2);border:1px solid var(--line);padding:5px 11px;border-radius:6px;transition:all .13s ease;}
+  .cmdchip:hover{border-color:var(--acline);background:var(--acdim);color:#fff;} .cmdchip::before{content:"$ ";color:#6ee7a8;}
+  /* explorer / pickers */
+  .explorer{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:14px;}
+  .pickbtn{font-family:var(--mono);font-size:13.5px;font-weight:600;cursor:pointer;padding:11px 8px;border-radius:9px;border:1px solid var(--line);background:var(--bg2);color:var(--tx);transition:all .14s ease;text-align:center;}
+  .pickbtn:hover{border-color:var(--acline);color:var(--ac2);background:var(--acdim);}
+  .pickbtn.on{background:var(--ac);color:var(--ink);border-color:var(--ac);}
+  .pickbtn small{display:block;font-family:var(--sans);font-size:10px;font-weight:500;opacity:.7;margin-top:3px;}
+  .explain{padding:14px 16px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);font-size:15.5px;min-height:30px;line-height:1.55;}
+  .explain .et{font-weight:680;color:var(--ac2);}
+  .stepnote{font-family:var(--mono);font-size:13px;color:var(--tx2);margin-top:12px;min-height:18px;line-height:1.5;} .stepnote b{color:var(--ac2);font-weight:600;}
+  .twocol{display:grid;grid-template-columns:1.35fr 1fr;gap:15px;align-items:start;} @media (max-width:820px){.twocol{grid-template-columns:1fr;}}
+  .console{background:#080a0f;border:1px solid var(--line);border-radius:9px;font-family:var(--mono);font-size:13px;color:#cdd3df;padding:12px 14px;min-height:110px;max-height:230px;overflow-y:auto;white-space:pre-wrap;}
+  .console .pid{color:var(--ac2);} .console .dim{color:var(--tx3);} .console .gn{color:#6ee7a8;}
+  /* fs tree */
+  .fstree{font-family:var(--mono);font-size:13.5px;line-height:1.7;color:var(--tx);background:#080a0f;border:1px solid var(--line);border-radius:9px;padding:13px 15px;min-height:110px;}
+  .fstree .d{color:var(--cyan);} .fstree .f{color:var(--tx2);} .fstree .cur{color:var(--ac2);font-weight:700;}
+  /* perms */
+  .permgrid{display:grid;grid-template-columns:auto repeat(3,1fr);gap:7px;max-width:380px;margin:6px 0 14px;}
+  .permgrid .pl{font-family:var(--mono);font-size:13px;color:var(--tx2);align-self:center;}
+  .permcell{font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer;text-align:center;padding:9px 0;border-radius:7px;border:1px solid var(--line);background:var(--bg2);color:var(--tx3);transition:all .12s ease;user-select:none;}
+  .permcell.on{background:var(--acdim);border-color:var(--acline);color:var(--ac2);}
+  .permcell .hd{display:block;font-size:10px;color:var(--tx3);font-weight:500;}
+  .pickrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .opt2{font-family:var(--mono);font-size:13px;font-weight:600;cursor:pointer;padding:8px 13px;border-radius:7px;border:1px solid var(--line);background:var(--bg2);color:var(--tx);transition:all .13s ease;}
+  .opt2:hover{border-color:var(--acline);color:var(--ac2);} .opt2.on{background:var(--ac);color:var(--ink);border-color:var(--ac);}
+  /* process tree */
+  .ptree-wrap{overflow-x:auto;padding:4px 0;}
+  .ptree g.enter{animation:pop .4s cubic-bezier(.22,.61,.36,1) backwards;}
+  .ptree g.pulse .node-box{filter:drop-shadow(0 0 7px var(--ac));}
+  .ptree g.clk{cursor:pointer;} .ptree g.sel .node-box{stroke-width:2.4;filter:drop-shadow(0 0 8px var(--ac));}
+  .ptree g.st-run .node-box{fill:var(--acdim);stroke:var(--ac);} .ptree g.st-run text{fill:var(--ac2);}
+  .ptree g.st-wait .node-box{fill:var(--amberd);stroke:var(--amber);} .ptree g.st-wait text{fill:var(--amber);}
+  .ptree g.st-zombie .node-box{fill:var(--redd);stroke:var(--red);stroke-dasharray:5 3;} .ptree g.st-zombie text{fill:var(--red);}
+  .ptree g.st-exec .node-box{fill:var(--cyand);stroke:var(--cyan);} .ptree g.st-exec text{fill:var(--cyan);}
+  .ptree g.st-root .node-box{fill:var(--surface3);stroke:var(--ac2);} .ptree g.st-root text{fill:#fff;}
+  .pidtable{font-family:var(--mono);font-size:12.5px;border-collapse:collapse;width:100%;margin-top:2px;}
+  .pidtable th,.pidtable td{padding:5px 9px;border-bottom:1px solid var(--line3);text-align:left;} .pidtable th{color:var(--tx3);font-weight:600;}
+  .badge{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:5px;}
+  .badge.run{background:var(--acdim);color:var(--ac2);} .badge.wait{background:var(--amberd);color:var(--amber);} .badge.zombie{background:var(--redd);color:var(--red);} .badge.exec{background:var(--cyand);color:var(--cyan);}
+  .actionbar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:0 0 14px;padding:11px 13px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;}
+  .actionbar .who{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ac2);margin-right:4px;}
+  /* byte strip */
+  .bytestrip{display:flex;gap:3px;padding:26px 4px 8px;overflow-x:auto;position:relative;}
+  .cell{flex:0 0 auto;width:25px;height:33px;border-radius:5px;background:var(--bg2);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--tx3);position:relative;transition:all .2s ease;}
+  .cell.filled{background:var(--acdim);border-color:var(--acline);color:var(--ac2);}
+  .cell.just{animation:pop .35s ease;background:var(--greend);border-color:var(--greenl);color:var(--green);}
+  .cell.readhi{background:var(--cyand);border-color:var(--cyanl);color:var(--cyan);}
+  .cell .idx{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--tx3);font-weight:600;}
+  .offmark{position:absolute;top:2px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--red);transition:left .35s cubic-bezier(.4,0,.2,1);}
+  .offmark .ol{position:absolute;top:-19px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--red);white-space:nowrap;}
+  .oplog{font-family:var(--mono);font-size:12.5px;color:var(--tx2);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-top:14px;max-height:150px;overflow-y:auto;}
+  .oplog div{padding:1px 0;} .oplog .ok{color:var(--green);} .oplog .mv{color:var(--red);} .oplog .dim{color:var(--tx3);}
+  .genc{font-family:var(--mono);font-size:13px;background:var(--bg2);color:#cdd3df;border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-top:14px;white-space:pre;overflow-x:auto;min-height:40px;} .genc .c-com{color:var(--ccom);}
+  /* hero */
+  .hero-term{background:#080a0f;border:1px solid var(--line);border-radius:11px;overflow:hidden;margin:24px 0;max-width:560px;}
+  .hero-term .term-out{min-height:0;} .ret{display:inline-block;font-family:var(--mono);font-weight:600;padding:1px 7px;border-radius:5px;font-size:.9em;}
+  .ret.pos{background:var(--greend);color:var(--green);} .ret.neg{background:var(--redd);color:var(--red);} .ret.zero{background:var(--acdim);color:var(--ac2);}
+  .start-btn{font-family:var(--sans);font-size:16px;font-weight:640;padding:13px 26px;border-radius:10px;border:1px solid var(--ac);background:var(--ac);color:var(--ink);cursor:pointer;transition:all .16s ease;}
+  .start-btn:hover{background:var(--ac2);box-shadow:0 8px 28px rgba(124,131,255,.35);transform:translateY(-1px);}
+  .start-btn.ghost{background:transparent;color:var(--ac2);border-color:var(--line);} .start-btn.ghost:hover{background:var(--acdim);border-color:var(--acline);box-shadow:none;}
+  .tag{font-family:var(--mono);font-size:12.5px;font-weight:600;padding:4px 11px;border-radius:6px;background:var(--surface2);color:var(--ac2);border:1px solid var(--line);}
+  .pillrow{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0;}
+  /* memory-after-fork */
+  .memboxes{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 14px;align-items:stretch;}
+  .membox{flex:0 0 auto;background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:14px 20px;font-family:var(--mono);font-size:12.5px;color:var(--tx3);min-width:158px;text-align:center;transition:all .25s ease;}
+  .membox.parent{border-color:var(--acline);background:var(--acdim);} .membox.child{border-color:var(--cyanl);background:var(--cyand);}
+  .membox .ml{font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:11px;}
+  .membox.parent .ml{color:var(--ac2);} .membox.child .ml{color:var(--cyan);}
+  .membox .memx{display:block;margin-top:9px;font-size:22px;font-weight:700;color:var(--tx);}
+  .membox.parent .memx{color:var(--ac2);} .membox.child .memx{color:var(--cyan);}
+  .memarrow{display:flex;align-items:center;color:var(--tx3);font-size:22px;}
+  /* roadmap timeline */
+  .roadmap{margin:16px 0;padding:0;list-style:none;}
+  .roadmap li{position:relative;padding:11px 0 11px 30px;border-bottom:1px solid var(--line3);}
+  .roadmap li:last-child{border-bottom:0;}
+  .roadmap li::before{content:"";position:absolute;left:3px;top:18px;width:10px;height:10px;border-radius:50%;background:var(--surface3);border:2px solid var(--line);z-index:1;}
+  .roadmap li::after{content:"";position:absolute;left:7px;top:24px;bottom:-1px;width:1px;background:var(--line);}
+  .roadmap li:last-child::after{display:none;}
+  .roadmap li.done::before{background:var(--tx3);border-color:var(--tx3);}
+  .roadmap li.here::before{background:var(--ac);border-color:var(--ac);box-shadow:0 0 0 4px var(--acdim),0 0 12px var(--ac);}
+  .roadmap .rc{font-family:var(--mono);font-size:12px;color:var(--tx3);margin-right:12px;}
+  .roadmap .rt{font-weight:600;color:var(--tx);}
+  .roadmap .rd{display:block;font-size:13.5px;color:var(--tx2);margin-top:4px;line-height:1.5;}
+  .roadmap li.here .rd{color:var(--tx);}
+  .roadmap li.here{background:var(--acdim);border-radius:8px;margin-left:-8px;padding-left:38px;padding-right:12px;}
+  .roadmap li.here .rt{color:var(--ac2);font-weight:700;}
+  .roadmap li.done .rt{color:var(--tx2);}
+  .roadmap .htag{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ac);background:var(--acdim);border:1px solid var(--acline);padding:2px 8px;border-radius:5px;margin-left:9px;white-space:nowrap;}
+  .roadmap .stag{font-family:var(--mono);font-size:10.5px;color:var(--tx3);margin-left:9px;}
+  /* bottom nav */
+  .bottomnav{position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px clamp(16px,4vw,40px);background:rgba(10,12,18,.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line2);}
+  .navbtn{font-family:var(--sans);font-size:15px;font-weight:640;cursor:pointer;padding:10px 22px;border-radius:9px;border:1px solid var(--ac);background:var(--ac);color:var(--ink);transition:all .14s ease;min-width:118px;}
+  .navbtn.ghost{background:transparent;color:var(--tx);border-color:var(--line);} .navbtn:hover:not(:disabled){background:var(--ac2);transform:translateY(-1px);} .navbtn.ghost:hover:not(:disabled){color:var(--ac2);border-color:var(--acline);background:var(--acdim);}
+  .navbtn:disabled{opacity:.35;cursor:not-allowed;}
+  .ndots{display:flex;gap:6px;align-items:center;} .ndot{width:7px;height:7px;border-radius:50%;background:var(--line);cursor:pointer;transition:all .18s ease;border:0;padding:0;} .ndot.active{background:var(--ac);width:22px;border-radius:4px;}
+  @media (max-width:640px){.ndots{display:none;} .navbtn{min-width:0;flex:1;} .kbd-hint{display:none;}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">~/</div>
+    <div><div class="c1">CSE321 / OS Lab</div><div class="c2">Lab 01 — System Calls &amp; Process Creation</div></div>
+  </div>
+  <div class="meta">
+    <div class="dots3" aria-hidden="true"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+    <div class="ring" id="ring"><svg width="44" height="44"><circle cx="22" cy="22" r="18" fill="none" stroke="#232a38" stroke-width="4"/><circle id="ringfg" cx="22" cy="22" r="18" fill="none" stroke="#7c83ff" stroke-width="4" stroke-linecap="round" stroke-dasharray="113.1" stroke-dashoffset="101.8"/></svg><span class="rt" id="ringtxt">1/10</span></div>
+    <span class="kbd-hint"><kbd>&larr;</kbd> <kbd>&rarr;</kbd><br>navigate</span>
+  </div>
+</header>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<nav class="pills" id="pills" aria-label="Sections"></nav>
+
+<main id="stage">
+
+  <!-- 0 OVERVIEW -->
+  <section class="slide active" data-title="Overview">
+    <div class="eyebrow">CSE321 · Operating Systems Lab · Summer 2026</div>
+    <h1 class="title">Operating Systems Lab</h1>
+    <p class="sub">The laboratory component of the Operating Systems course. Each session pairs a concept with code you write and run yourself, first in C on Linux and later inside a small instructional kernel, xv6.</p>
+    <div class="hero-term">
+      <div class="term-bar"><span class="dots3"><i class="r"></i><i class="y"></i><i class="g"></i></span><span class="tt">student@oslab: ~/oslab</span></div>
+      <div class="term-out"><span class="pr">student@oslab:~/oslab$</span> <span class="cm">gcc hello.c -o hello</span>
+<span class="pr">student@oslab:~/oslab$</span> <span class="cm">./hello</span>
+Hello, World!
+<span class="pr">student@oslab:~/oslab$</span> <span style="background:#6ee7a8;color:#6ee7a8">_</span></div>
+    </div>
+    <h3><span class="hx">i</span>About this course lab</h3>
+    <p>Over the semester this lab covers the core building blocks of an operating system through practical exercises: the Linux command line and C programming, process and thread management, thread synchronization, inter-process communication, and the internals of xv6, a small instructional kernel in which you implement system calls and process scheduling. The emphasis throughout is on understanding each concept by implementing it.</p>
+
+    <h3><span class="hx">↗</span>What the rest of the semester covers</h3>
+    <p class="muted" style="margin-bottom:8px">An outline of the lab sessions ahead, so this week's topic fits into the larger sequence.</p>
+    <ul class="roadmap">
+      <li class="done"><span class="rc">Class 0</span><span class="rt">Basic shell commands &amp; C programming</span><span class="stag">self-study · buX</span><div class="rd">The Linux command line (navigating directories, managing files, running programs) and the fundamentals of C: variables, functions, pointers, and compiling with <code>gcc</code>. Completed independently through the buX online tutorials before the in-person sessions, as the later labs assume it.</div></li>
+      <li class="here"><span class="rc">Class 1</span><span class="rt">System Calls</span><span class="htag">this week</span><div class="rd">How a program requests services from the kernel: file and descriptor I/O (<code>open</code>, <code>read</code>, <code>write</code>, <code>lseek</code>, <code>close</code>), process creation and control (<code>fork</code>, <code>exec</code>, <code>wait</code>), and tracing the calls a program makes. These same calls are later implemented inside xv6.</div></li>
+      <li><span class="rc">Class 2</span><span class="rt">Linux shell scripting</span><div class="rd">Writing bash scripts to automate routine tasks. Covers variables, conditionals and loops, reading user input, and handling command-line arguments.</div></li>
+      <li><span class="rc">Class 3</span><span class="rt">Assessment 1</span><div class="rd">An assessment of the Class 0 material: basic shell commands and the C fundamentals studied through the buX tutorials.</div></li>
+      <li><span class="rc">Class 4</span><span class="rt">Threads &amp; synchronization</span><div class="rd">Creating and managing multiple threads within a single process using POSIX threads (<code>pthreads</code>), and resolving the race conditions that arise when threads share data, using mutexes and semaphores.</div></li>
+      <li><span class="rc">Class 5</span><span class="rt">Inter-process communication (IPC)</span><div class="rd">Mechanisms for exchanging data between separate processes that do not share memory: pipes, shared memory, and message passing.</div></li>
+      <li><span class="rc">Class 6</span><span class="rt">xv6 — introduction</span><div class="rd">An introduction to xv6, a small instructional operating system modelled on Unix. Covers installing and booting it, the structure of the codebase, kernel and user space, the file-system hierarchy, and writing user programs.</div></li>
+      <li><span class="rc">Class 7</span><span class="rt">xv6 — features</span><div class="rd">Working inside the kernel: implementing and tracing system calls, the process structure and context switching, and how preemptive scheduling selects the next process to run.</div></li>
+      <li><span class="rc">Class 8</span><span class="rt">Assessment 2</span><div class="rd">An assessment covering system calls (Class 1) and threads and synchronization (Class 4).</div></li>
+      <li><span class="rc">Class 9</span><span class="rt">Review &amp; project viva</span><div class="rd">A review of the semester's material, followed by the term-project viva.</div></li>
+    </ul>
+    <p class="muted" style="font-size:14px">The topics build on one another. The system calls covered this week are implemented inside the kernel in Class 7, and the processes created this week are connected through inter-process communication in Class 5.</p>
+
+    <h3><span class="hx">i</span>This week: System Calls &amp; Process Creation</h3>
+    <p>A system call is the interface a program uses to request a service from the operating system. This session covers the file and file-descriptor calls (<code>open</code>, <code>read</code>, <code>write</code>, <code>lseek</code>, <code>close</code>), the process calls (<code>fork</code>, <code>exec</code>, <code>wait</code>), and how to trace the calls a program makes. The sections that follow are interactive: you compile and run C in a terminal, operate file descriptors directly, and build process trees step by step rather than only reading about them.</p>
+    <div class="note"><span class="h">Objective</span>Establish a working understanding of system calls that carries forward into xv6 and the remaining labs.</div>
+
+    <h3><span class="hx">✓</span>By the end of this session you should be able to</h3>
+    <ul>
+      <li>Navigate Linux and compile and run C programs from the terminal.</li>
+      <li>Explain what a system call is and trace the calls a program makes.</li>
+      <li>Use the file I/O calls (<code>open</code>, <code>read</code>, <code>write</code>, <code>lseek</code>, <code>close</code>) and file descriptors.</li>
+      <li>Create and manage processes with <code>fork</code>, <code>wait</code>, <code>exec</code>, and <code>exit</code>.</li>
+      <li>Reason about process trees, zombie and orphan processes, and output ordering.</li>
+    </ul>
+
+    <h3><span class="hx">≡</span>Topics in this session</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th style="width:34%">Topic</th><th>The calls &amp; ideas</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Linux &amp; the shell</strong></td><td><code>pwd</code>, <code>ls</code>, <code>cd</code>, <code>mkdir</code>, <code>gcc</code>, <code>./run</code></td></tr>
+        <tr><td><strong>Writing &amp; compiling C</strong></td><td><code>#include</code>, <code>main</code>, <code>printf</code>, <code>gcc</code>, reading compiler errors</td></tr>
+        <tr><td><strong>System calls</strong></td><td>the user / kernel boundary, <code>strace</code></td></tr>
+        <tr><td><strong>File I/O</strong></td><td><code>open</code>, <code>read</code>, <code>write</code>, <code>lseek</code>, <code>close</code>, file descriptors, permissions</td></tr>
+        <tr><td><strong>Processes</strong></td><td><code>fork</code>, <code>wait</code>, <code>exec</code>, <code>exit</code>, zombies, orphans</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="note warn"><span class="h">Prerequisite</span>Class 0 covered basic shell commands and C programming through the buX online tutorials. If you have not completed it, the next two sections begin from first principles.</div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px"><button class="start-btn" onclick="go(1)">Begin the lab &rarr;</button><button class="start-btn ghost" onclick="go(8)">Skip to practice</button></div>
+  </section>
+
+  <!-- 1 LINUX & SHELL -->
+  <section class="slide" data-title="Shell">
+    <div class="eyebrow">01 · Linux &amp; the shell</div>
+    <h2>Moving Around in Linux</h2>
+    <p class="sub">Every later task runs from the shell, so we begin there. As you type commands in the panel below, the directory tree on the right updates to match.</p>
+    <div class="note"><span class="h">Opening a terminal</span>The terminal (also called the shell) is the program where you type the commands used throughout this lab. How to open one depends on your system:
+      <ul style="margin:8px 0 0">
+        <li><strong>Native Linux:</strong> press <span class="kbd">Ctrl</span>+<span class="kbd">Alt</span>+<span class="kbd">T</span>, or search for “Terminal” in the applications menu.</li>
+        <li><strong>Windows:</strong> install the Windows Subsystem for Linux (WSL), or run a Linux virtual machine, then open the Ubuntu terminal. The built-in Command Prompt and PowerShell are not Linux shells and will not run these commands.</li>
+        <li><strong>macOS:</strong> open the built-in Terminal app (Applications → Utilities → Terminal). macOS is Unix-based, so the commands here work directly.</li>
+      </ul></div>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Live shell</span> Navigate a filesystem</div><button class="btn ghost sm" onclick="nvReset()">Reset</button></div>
+      <div class="sim-body">
+        <div class="twocol">
+          <div>
+            <div class="terminal solo">
+              <div class="term-bar"><span class="dots3"><i class="r"></i><i class="y"></i><i class="g"></i></span><span class="tt">bash</span></div>
+              <div class="term-out" id="nvOut" style="min-height:150px"></div>
+              <div class="term-in"><span class="ps">$</span><input id="nvIn" placeholder="try: ls, mkdir src, cd src, pwd, touch a.c, cd .., tree" autocomplete="off" spellcheck="false" /></div>
+            </div>
+            <div class="chiprow" id="nvChips" style="margin-top:11px"></div>
+          </div>
+          <div><div class="muted" style="font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:6px">~/oslab/ tree</div><div class="fstree" id="nvTree"></div></div>
+        </div>
+      </div>
+    </div>
+    <h3><span class="hx">i</span>Command reference</h3>
+    <div class="tablewrap"><table><thead><tr><th style="width:30%">Command</th><th>What it does</th></tr></thead><tbody>
+      <tr><td><code>pwd</code></td><td>Print the current directory (where am I?)</td></tr>
+      <tr><td><code>ls</code></td><td>List files in the current directory</td></tr>
+      <tr><td><code>cd dir</code> / <code>cd ..</code></td><td>Enter a folder / go up one level</td></tr>
+      <tr><td><code>mkdir dir</code></td><td>Make a new folder</td></tr>
+      <tr><td><code>touch file</code></td><td>Create an empty file</td></tr>
+      <tr><td><code>gcc f.c -o out</code></td><td>Compile a C file into a program named <code>out</code></td></tr>
+    </tbody></table></div>
+  </section>
+
+  <!-- 2 WRITE & COMPILE C -->
+  <section class="slide" data-title="Compile C">
+    <div class="eyebrow">02 · Write, compile &amp; run C</div>
+    <h2>Your First C Program</h2>
+    <p class="sub">Edit the program below, compile it, and run it. Introducing a deliberate error shows how the compiler reports problems. Several starter programs are available to load.</p>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Live</span> C editor &amp; terminal</div><button class="btn ghost sm" onclick="codeReset()">Reset code</button></div>
+      <div class="sim-body">
+        <div class="pickrow" id="progLoader"></div>
+        <div class="editor">
+          <div class="ed-bar"><span class="fn">hello.c</span><span class="badge">editable</span></div>
+          <textarea class="ceditor" id="cEditor" spellcheck="false"></textarea>
+        </div>
+        <div class="terminal">
+          <div class="term-bar"><span class="dots3"><i class="r"></i><i class="y"></i><i class="g"></i></span><span class="tt">student@oslab: ~/oslab</span></div>
+          <div class="term-out" id="termOut"></div>
+          <div class="term-in"><span class="ps">$</span><input id="termInput" placeholder="gcc hello.c -o hello   then   ./hello   (or: help)" autocomplete="off" spellcheck="false" /></div>
+        </div>
+        <div class="chiprow" id="termChips" style="margin-top:11px"></div>
+      </div>
+    </div>
+    <h3><span class="hx">f</span>printf format specifiers</h3>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Explore</span> How each specifier formats a value</div></div>
+      <div class="sim-body">
+        <div class="explorer" id="pfList"></div>
+        <div class="explain" id="pfExplain"></div>
+      </div>
+    </div>
+    <h3><span class="hx">!</span>Common errors — click to diagnose</h3>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Explore</span> Symptom &rarr; cause &amp; fix</div></div>
+      <div class="sim-body"><div class="explorer" id="errExplorer"></div><div class="explain" id="errExplain"><span class="et">Pick an error</span> above to see what it means and how to fix it.</div></div>
+    </div>
+  </section>
+
+  <!-- 3 SYSTEM CALLS -->
+  <section class="slide" data-title="Syscalls">
+    <div class="eyebrow">03 · System calls</div>
+    <h2>What Is a System Call?</h2>
+    <p class="lead">A <strong>system call</strong> is a request for the operating system to perform an action on a program's behalf, such as accessing a file or creating a process: operations a program <strong>cannot carry out on its own</strong>.</p>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Step it</span> A call crossing the kernel boundary</div>
+        <div style="display:flex;gap:7px;align-items:center"><select class="field" id="scPick"><option value="write">write()</option><option value="open">open()</option><option value="read">read()</option><option value="fork">fork()</option></select><button class="btn sm" id="scStepBtn" onclick="scStep()">Step ›</button><button class="btn ghost sm" onclick="scReset()">Reset</button></div>
+      </div>
+      <div class="sim-body">
+        <div class="scbar">
+          <span class="scmode user" id="scMode">CPU mode: user</span>
+          <span class="scregs" id="scRegs">registers idle</span>
+        </div>
+        <div class="diagram" style="margin:0;border:0;padding:0;background:none">
+          <svg viewBox="0 0 760 360" id="scSvg" role="img" aria-label="The system-call mechanism, from user program to kernel and back">
+            <rect x="12" y="14" width="736" height="120" rx="12" fill="#11141d" stroke="#232a38"/>
+            <text x="30" y="38" font-family="var(--mono)" font-size="12" fill="#39d0d8" font-weight="700">USER SPACE</text>
+            <g class="scbox" id="scUser"><rect x="30" y="52" width="232" height="60" rx="9" fill="#161b26" stroke="#2a3344"/><text x="146" y="79" text-anchor="middle" font-family="var(--sans)" font-size="13" font-weight="600" fill="#e7eaf1">your program</text><text x="146" y="98" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="#9aa3b4">limited privileges</text></g>
+            <text id="scCode" x="288" y="86" font-family="var(--mono)" font-size="14" fill="#cdd3df"></text>
+            <line x1="12" y1="152" x2="748" y2="152" stroke="#2a3344" stroke-width="1.5" stroke-dasharray="6 6"/>
+            <g class="scbox" id="scGate"><rect x="316" y="134" width="128" height="36" rx="8" fill="#0c0f16" stroke="#2a3344"/><text x="380" y="157" text-anchor="middle" font-family="var(--mono)" font-size="11.5" fill="#9aa3b4">trap instruction</text></g>
+            <rect x="12" y="188" width="736" height="160" rx="12" fill="#0c0f16" stroke="#232a38"/>
+            <text x="30" y="212" font-family="var(--mono)" font-size="12" fill="#9ea3ff" font-weight="700">KERNEL SPACE</text>
+            <g class="scbox" id="scDisp"><rect x="34" y="252" width="156" height="66" rx="9" fill="#161b26" stroke="#2a3344"/><text x="112" y="281" text-anchor="middle" font-size="12.5" font-weight="600" fill="#e7eaf1">syscall table</text><text x="112" y="300" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="#9aa3b4">dispatcher</text></g>
+            <g class="scbox" id="scHandler"><rect x="300" y="252" width="172" height="66" rx="9" fill="#161b26" stroke="#2a3344"/><text id="scHandlerT" x="386" y="281" text-anchor="middle" font-family="var(--mono)" font-size="13" fill="#e7eaf1">sys_write()</text><text x="386" y="300" text-anchor="middle" font-size="10.5" fill="#9aa3b4">handler</text></g>
+            <g class="scbox ondev" id="scDevice"><rect x="584" y="252" width="152" height="66" rx="9" fill="#161b26" stroke="#2a3344"/><text id="scDeviceT" x="660" y="281" text-anchor="middle" font-size="12.5" font-weight="600" fill="#e7eaf1">terminal</text><text x="660" y="300" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="#9aa3b4">device</text></g>
+            <g id="scPacket" opacity="0" transform="translate(146,80)"><rect x="-48" y="-15" width="96" height="30" rx="7" fill="#7c83ff" stroke="#9ea3ff"/><text id="scPacketT" x="0" y="5" text-anchor="middle" font-family="var(--mono)" font-size="12" font-weight="700" fill="#0a0c12">write</text></g>
+          </svg>
+        </div>
+        <p class="caption" id="scCaption">Choose a call and press <strong>Step</strong> to follow it from your program into the kernel and back.</p>
+      </div>
+    </div>
+    <div class="note"><span class="h">Why they exist</span>A program runs in <em>user space</em> with limited privileges. Accessing hardware, files, or the process table requires the kernel, and the system call is the controlled entry point to it.</div>
+    <h3><span class="hx">7</span>The seven calls — click to explore</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Explore</span> Today's system calls</div></div>
+      <div class="sim-body"><div class="explorer" id="callExplorer"></div><div class="explain" id="callExplain"><span class="et">Click a call</span> to see what it does and which family it belongs to.</div></div></div>
+    <h3><span class="hx">?</span>User space or kernel? — click each</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Sort it</span> Which needs a system call</div><button class="btn ghost sm" onclick="ukReset()">Reset</button></div>
+      <div class="sim-body"><div class="explorer" id="ukList"></div><p class="stepnote" id="ukNote">Click each operation to reveal whether your program can do it directly, or must ask the kernel via a system call.</p></div></div>
+    <h3><span class="hx">$</span>strace — see the calls a program makes</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Trace</span> strace &lt;program&gt;</div></div>
+      <div class="sim-body"><div class="pickrow" id="straceProg"></div>
+        <div class="console" id="straceOut" style="min-height:140px"></div>
+        <p class="muted" style="font-size:13.5px;margin:11px 0 0">Each line is one system call the program made, with its return value — exactly what <code>strace ./prog</code> shows you in real life.</p></div></div>
+  </section>
+
+  <!-- 4 FILE I/O -->
+  <section class="slide" data-title="File I/O">
+    <div class="eyebrow">04 · File I/O</div>
+    <h2>File Descriptors &amp; the I/O Calls</h2>
+    <p class="sub">Five calls work together: <code>open</code> a file, <code>read</code> or <code>write</code> its bytes, <code>lseek</code> to reposition, and <code>close</code> it. The lab below performs each operation, generates the corresponding C, and tracks the descriptor table.</p>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Drive it</span> File descriptor lab</div><button class="btn ghost sm" onclick="flReset()">Reset</button></div>
+      <div class="sim-body">
+        <p class="muted" style="margin:0 0 8px;font-size:13.5px"><strong>1.</strong> Choose <code>open()</code> flags, then open:</p>
+        <div class="pickrow" id="flFlags"></div>
+        <div class="sim-controls"><span style="color:var(--tx2);font-size:13px">mode</span><input class="field" id="flMode" value="0600" style="width:78px" /><button class="btn" id="flOpenBtn" onclick="flOpen()">open("testfile", flags, mode)</button></div>
+        <div class="statrow">
+          <div class="stat"><span class="sv" id="flFdVal">—</span><span class="sl">fd</span></div>
+          <div class="stat"><span class="sv" id="flOff">0</span><span class="sl">offset</span></div>
+          <div class="stat cyan"><span class="sv" id="flSize">0</span><span class="sl">file size</span></div>
+          <div class="stat amber"><span class="sv" id="flRet">—</span><span class="sl">last return</span></div>
+        </div>
+        <p class="muted" style="margin:0 0 8px;font-size:13.5px"><strong>2.</strong> Operate on the open file:</p>
+        <div class="sim-controls"><input class="field wide" id="flStr" value="Hello, world" /><button class="btn" onclick="flWrite()">write</button>
+          <span style="color:var(--tx2);font-size:13px">lseek(</span><input class="field" id="flN" type="number" value="0" /><select class="field" id="flWhence"><option value="SET">SEEK_SET</option><option value="CUR">SEEK_CUR</option><option value="END">SEEK_END</option></select><span style="color:var(--tx2);font-size:13px">)</span><button class="btn ghost" onclick="flSeek()">go</button>
+          <button class="btn cyan" onclick="flRead()">read(<input class="field" id="flReadN" type="number" value="5" style="width:46px" />)</button><button class="btn ghost" onclick="flClose()">close</button></div>
+        <div class="bytestrip" id="flStrip"></div>
+        <div class="twocol" style="margin-top:14px">
+          <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">Generated C</div><div class="genc" id="flGenC"></div></div>
+          <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">fd table &amp; log</div><table class="pidtable" id="fdTable"></table><div class="oplog" id="flLog" style="margin-top:9px"></div></div>
+        </div>
+        <div class="sim-controls" style="margin:16px 0 0"><span class="muted" style="font-size:13.5px">Load a lecture program:</span>
+          <button class="btn sm" onclick="flPreset('together')">open+write+lseek+read+close</button>
+          <button class="btn sm" onclick="flPreset('ex2')">Example 2 (write 45)</button>
+          <button class="btn sm cyan" onclick="flPreset('ex3')">Example 3 — the “50 not 90”</button></div>
+      </div>
+    </div>
+    <h3><span class="hx">+</span><code>open()</code> flags</h3>
+    <p>Returns a non-negative <strong>file descriptor</strong> on success <span class="ret pos">&ge; 0</span>, or <span class="ret neg">-1</span> on failure. <code>mode</code> (e.g. <code>0600</code>) sets permissions, needed only when creating. Toggle these in the lab:</p>
+    <div class="tablewrap"><table><thead><tr><th style="width:30%">Flag</th><th>Meaning</th></tr></thead><tbody>
+      <tr><td><code>O_RDONLY</code></td><td>Open for reading only</td></tr><tr><td><code>O_WRONLY</code></td><td>Open for writing only</td></tr>
+      <tr><td><code>O_RDWR</code></td><td>Open for both reading and writing</td></tr><tr><td><code>O_APPEND</code></td><td>Append new data to the <strong>end</strong> of the file</td></tr>
+      <tr><td><code>O_TRUNC</code></td><td>Clear all existing data first</td></tr><tr><td><code>O_CREAT</code></td><td>Create the file if it does not exist (requires <code>mode</code>)</td></tr>
+      <tr><td><code>O_EXCL</code></td><td>With <code>O_CREAT</code>, fail if the file already exists</td></tr>
+    </tbody></table></div>
+    <h3><span class="hx">rwx</span>Permission (mode) explorer</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Toggle</span> octal mode &harr; rwx</div></div>
+      <div class="sim-body">
+        <div class="permgrid" id="permGrid"></div>
+        <div class="statrow"><div class="stat"><span class="sv" id="permOct">600</span><span class="sl">octal</span></div><div class="stat cyan"><span class="sv" id="permStr" style="font-size:18px">rw-------</span><span class="sl">symbolic</span></div></div>
+        <p class="muted" style="font-size:13.5px;margin:0">Each digit is the sum of <strong>read = 4</strong>, <strong>write = 2</strong>, <strong>execute = 1</strong>, for owner / group / others. So <code>0600</code> = owner can read+write, nobody else.</p>
+      </div></div>
+    <h3><span class="hx">↹</span><code>read</code> / <code>write</code> / <code>close</code> / <code>lseek</code></h3>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">int read(int file_descriptor, char *buffer_pointer, unsigned transfer_size);
+int write(int file_descriptor, char *buffer_pointer, unsigned transfer_size);
+int close(int file_descriptor);</code></pre></div>
+    <p><code>read</code>/<code>write</code> return the number of bytes transferred (or <span class="ret neg">-1</span>). <code>lseek</code> repositions the offset — try each in the lab:</p>
+    <div class="tablewrap"><table><thead><tr><th style="width:44%">Call</th><th>Effect</th></tr></thead><tbody>
+      <tr><td><code>lseek(fd, 5, SEEK_SET)</code></td><td>Move to 5 bytes <strong>from the beginning</strong></td></tr>
+      <tr><td><code>lseek(fd, 5, SEEK_CUR)</code></td><td>Move 5 bytes forward <strong>from the current</strong> position</td></tr>
+      <tr><td><code>lseek(fd, -5, SEEK_CUR)</code></td><td>Move 5 bytes <strong>back</strong> from current</td></tr>
+      <tr><td><code>lseek(fd, -5, SEEK_END)</code></td><td>Move to 5 bytes back <strong>from the end</strong></td></tr>
+    </tbody></table></div>
+  </section>
+
+  <!-- 5 PROCESSES: FORK -->
+  <section class="slide" data-title="fork">
+    <div class="eyebrow">05 · Processes — fork()</div>
+    <h2>Creating Processes with <code>fork()</code></h2>
+    <p class="sub"><code>fork()</code> creates a child process as a copy of the parent and <strong>returns twice</strong>: <span class="ret zero">0</span> to the child, the child's <strong>PID</strong> <span class="ret pos">&gt; 0</span> to the parent, or <span class="ret neg">-1</span> on failure. In the sandbox below, select a process and apply an operation to build up a process tree.</p>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Sandbox</span> Process lab</div><button class="btn ghost sm" onclick="peReset()">Reset</button></div>
+      <div class="sim-body">
+        <div class="actionbar"><span class="who" id="peWho">selected: main (pid 1000)</span><button class="btn sm" onclick="peDo('fork')">fork()</button><button class="btn sm cyan" onclick="peDo('exec')">exec()</button><button class="btn sm warn" onclick="peDo('wait')">wait()</button><button class="btn sm danger" onclick="peDo('exit')">exit()</button></div>
+        <div class="twocol"><div class="ptree-wrap"><svg id="peSvg" class="ptree" role="img" aria-label="Process tree"></svg></div>
+          <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">Output &amp; events</div><div class="console" id="peConsole"></div>
+            <div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin:11px 0 5px">Process table</div><table class="pidtable" id="peTable"></table></div></div>
+        <p class="stepnote" id="peNote">Try: <b>fork</b> main, select the child, <b>exit</b> it → it becomes a <span style="color:var(--red)">zombie</span>. Select the parent and <b>wait()</b> to reap it.</p>
+      </div>
+    </div>
+    <h3><span class="hx">⑂</span>Which branch runs?</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Toggle</span> View as parent or child</div></div>
+      <div class="sim-body"><div class="sim-controls"><button class="btn sm" id="frParent" onclick="frRole('parent')">view as PARENT</button><button class="btn sm ghost" id="frChild" onclick="frRole('child')">view as CHILD</button></div>
+        <div class="code" style="margin:0"><div class="chead"><span class="lang"><span class="dot">●</span>C — the highlighted branch runs</span></div><pre><code id="frCode" data-lang="c">pid_t pid = fork();
+if (pid == 0)
+    printf("I'm the child\n");
+else if (pid &gt; 0)
+    printf("I'm the parent, child = %d\n", pid);</code></pre></div>
+        <div class="explain" id="frOut" style="margin-top:12px"></div></div></div>
+    <h3><span class="hx">2ⁿ</span>Fork program simulator — step a real program</h3>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Simulate</span> <code style="background:none;color:inherit;border:0;padding:0">fork()</code> &amp; <code style="background:none;color:inherit;border:0;padding:0">printf()</code>, line by line</div>
+        <div style="display:flex;gap:7px"><button class="btn sm" id="fpsStepBtn" onclick="fpsStep()">Step ›</button><button class="btn ghost sm" onclick="fpsRunAll()">Run all</button><button class="btn ghost sm" onclick="fpsReset()">Reset</button></div></div>
+      <div class="sim-body">
+        <div class="pickrow" id="fpsPresets"></div>
+        <div class="editor"><div class="ed-bar"><span class="fn">program.c</span><span class="badge">editable — edit it!</span></div><textarea class="ceditor" id="fpsCode" spellcheck="false" style="min-height:104px"></textarea></div>
+        <div class="statrow" style="margin-top:14px"><div class="stat"><span class="sv" id="fpsProc">1</span><span class="sl">processes</span></div><div class="stat green"><span class="sv" id="fpsPrints">0</span><span class="sl">total lines printed</span></div></div>
+        <div class="twocol">
+          <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">Execution (▶ = current line)</div><div class="fstree" id="fpsLines" style="min-height:auto"></div></div>
+          <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">Program output</div><div class="console" id="fpsOut" style="min-height:90px"></div></div>
+        </div>
+        <div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin:14px 0 5px">Process tree</div>
+        <div class="ptree-wrap"><svg id="fpsSvg" class="ptree" role="img" aria-label="Fork program process tree"></svg></div>
+        <p class="stepnote" id="fpsNote">Press <b>Step</b> to run one line in <b>every</b> live process. Each <code>fork()</code> doubles them; each <code>printf()</code> prints once per live process.</p>
+      </div></div>
+    <div class="note"><span class="h">The rule</span>Every <code>fork()</code> doubles the process count, so after n forks there are <strong>2ⁿ</strong> processes, and a <code>printf()</code> after k forks runs in all <strong>2ᵏ</strong> of them. For example, <code>printf("A"); fork(); printf("B");</code> prints one “A” and two “B”. This is the basis for Practice Task 3.</div>
+
+    <h3><span class="hx">⌗</span>After <code>fork()</code>, memory is <em>not</em> shared</h3>
+    <div class="sim">
+      <div class="sim-head"><div class="sim-title"><span class="tagi">Try it</span> Separate address spaces</div><button class="btn ghost sm" onclick="memReset()">Reset</button></div>
+      <div class="sim-body">
+        <div class="sim-controls"><button class="btn" id="memForkBtn" onclick="memFork()">fork()</button><button class="btn ghost" onclick="memParent()">parent: x = x + 1</button><button class="btn cyan" onclick="memChild()">child: x = 99</button></div>
+        <div class="memboxes" id="memBoxes"></div>
+        <p class="stepnote" id="memNote">One process, one variable. Press <code>fork()</code> to copy the address space — then change <code>x</code> in each and watch them stay independent.</p>
+      </div></div>
+    <h3><span class="hx">⟂</span>Order is not guaranteed — race it</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Run it</span> Parent &amp; child output interleaving</div></div>
+      <div class="sim-body"><div class="sim-controls"><button class="btn" onclick="rcRun()">Run the program</button><button class="btn ghost" id="rcWaitBtn" onclick="rcToggleWait()">wait(): off</button></div>
+        <div class="console" id="rcOut" style="min-height:90px"></div>
+        <p class="stepnote" id="rcNote">Run it several times — without <code>wait()</code>, parent and child output can interleave <b>differently each run</b>. Turn <code>wait()</code> on to force the child to finish first.</p>
+      </div></div>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0)
+        printf("\nI'm the child process\n");
+    else if (pid &gt; 0)
+        printf("\nI'm the parent process. My child pid is %d\n", pid);
+    else
+        perror("error in fork");
+
+    return 0;
+}</code></pre></div>
+  </section>
+
+  <!-- 6 WAIT, EXEC, STATES -->
+  <section class="slide" data-title="wait/exec">
+    <div class="eyebrow">06 · wait, exec &amp; process states</div>
+    <h2><code>wait()</code>, <code>exec()</code> &amp; Zombies</h2>
+    <p class="sub"><code>wait()</code> synchronizes a parent with its children, and <code>exec()</code> replaces a process's program entirely. The state machine below shows how a process moves from running to terminated to reaped.</p>
+    <h3><span class="hx">◷</span>Process state machine — step it</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Step it</span> running &rarr; zombie &rarr; reaped</div><div style="display:flex;gap:7px"><button class="btn sm" id="psStepBtn" onclick="psStep()">Next ›</button><button class="btn ghost sm" onclick="psReset()">Reset</button></div></div>
+      <div class="sim-body"><div class="diagram" style="margin:0;border:0;padding:0;background:none"><svg viewBox="0 0 760 150" id="psSvg" role="img" aria-label="Process state machine"></svg></div>
+        <p class="caption" id="psCap">Press <strong>Next</strong> to walk a process through its lifecycle.</p></div></div>
+    <h3><span class="hx">⏳</span><code>wait()</code> and zombies</h3>
+    <div class="note warn"><span class="h">Zombie process</span>A process that has <strong>terminated but whose exit status hasn't been collected</strong> by its parent. It lingers in the process table (its PID can't be reused) until the parent calls <code>wait()</code>. Reproduce it in the Process lab (Section 5): fork → child <code>exit()</code> → parent hasn't waited.</div>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Step it</span> Orphan vs zombie — when a child outlives its parent</div><div style="display:flex;gap:7px"><button class="btn sm" id="orpBtn" onclick="orpStep()">Next ›</button><button class="btn ghost sm" onclick="orpReset()">Reset</button></div></div>
+      <div class="sim-body"><div class="ptree-wrap"><svg id="orpSvg" class="ptree" role="img" aria-label="Orphan reparenting"></svg></div><p class="caption" id="orpCap">Press <strong>Next</strong> to watch a child get orphaned and reparented to init.</p></div></div>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;sys/wait.h&gt;
+
+int main() {
+    int status;
+    pid_t pid = fork();
+    if (pid == -1) { printf("fork failed\n"); exit(1); }
+
+    if (pid == 0) {            /* Child */
+        printf("Child here!\n");
+    } else {                   /* Parent */
+        wait(&amp;status);
+        printf("Well done kid!\n");
+    }
+    return 0;
+}</code></pre></div>
+    <h3><span class="hx">⟳</span>The <code>exec</code> family — click to compare</h3>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Explore</span> execl / execv / execlp / execvp</div></div>
+      <div class="sim-body"><div class="explorer" id="execList"></div><div class="explain" id="execExplain"><span class="et">Click a variant</span> to see how its arguments differ.</div></div></div>
+    <div class="note warn"><span class="h">Common mistake</span>The path must be the <strong>absolute path to the executable</strong>, for example <code>/bin/ls</code>, not a relative path or a directory with a trailing slash. Arguments are <strong>double-quoted strings</strong> (<code>"a"</code>), not single-quoted characters (<code>'a'</code>). Note also that a successful <code>exec</code> does not return.</div>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">int main() {
+    printf("1\n");
+    pid_t pid = fork();
+    if (pid == 0)
+        execl("/bin/ls", "ls", NULL);     /* child runs ls */
+    else if (pid &gt; 0)
+        execl("/bin/pwd", "pwd", NULL);    /* parent runs pwd */
+    return 0;
+}</code></pre></div>
+  </section>
+
+  <!-- 7 WORKED EXAMPLES -->
+  <section class="slide" data-title="Examples">
+    <div class="eyebrow">07 · Worked examples</div>
+    <h2>Run the Examples</h2>
+    <p class="sub">Step through each program to see the process tree, file, and output develop. The explanation can be revealed afterwards.</p>
+    <h3><span class="hx">1</span>Nested fork loop</h3>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">#define FORK_DEPTH 3
+
+int main() {
+    int i, r;
+    pid_t my_pid = getpid();
+
+    for (i = 1; i &lt;= FORK_DEPTH; i++) {
+        r = fork();
+        if (r &gt; 0) {
+            printf("Parent process %d forked child process %d\n", my_pid, r);
+        } else if (r == 0) {
+            my_pid = getpid();
+            if (i == FORK_DEPTH) {
+                r = execl("/bin/echo", "/bin/echo", "Hello World", NULL);
+                exit(1);   /* never expected to reach here */
+            }
+        } else { exit(1); }   /* r &lt; 0: fork failed */
+    }
+    return 0;
+}</code></pre></div>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Step it</span> Watch the tree grow &amp; "Hello World" print</div><button class="btn ghost sm" onclick="ex1Reset()">Reset</button></div>
+      <div class="sim-body"><div class="statrow"><div class="stat"><span class="sv" id="ex1Proc">1</span><span class="sl">processes</span></div><div class="stat cyan"><span class="sv" id="ex1I">0</span><span class="sl">loop i</span></div><div class="stat amber"><span class="sv" id="ex1Echo">0</span><span class="sl">“Hello World”</span></div></div>
+        <div class="sim-controls"><button class="btn" id="ex1StepBtn" onclick="ex1Step()">Run i = 1 ›</button><button class="btn ghost" onclick="ex1RunAll()">Run all</button><button class="btn ghost" onclick="ex1Reset()">Reset</button></div>
+        <div class="twocol"><div class="ptree-wrap"><svg id="ex1Svg" class="ptree" role="img" aria-label="Nested fork tree"></svg></div>
+          <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">Program output</div><div class="console" id="ex1Console"></div></div></div>
+        <p class="stepnote" id="ex1Note">Start: just <b>P0</b>. Each iteration, <b>every</b> process forks once — so the count doubles.</p></div></div>
+    <div class="hints"><button class="reveal-btn ac" onclick="toggleHint(this,'e1x')">Reveal the explanation</button></div>
+    <div class="hint-body" id="e1x" style="border-left-color:var(--ac)"><span class="hl" style="color:var(--ac2)">What happened</span>Neither the parent nor a still-looping child breaks out, so every process forks once per iteration: <strong>1 → 2 → 4 → 8</strong>. The <strong>4 children born at i = 3</strong> reach <code>FORK_DEPTH</code> and <code>execl("/bin/echo", …)</code>, so <strong>"Hello World" prints 4 times</strong>. After a fork, <code>i</code> is <strong>the same</strong> in parent and child; a child updating <code>my_pid</code> does <strong>not</strong> change the parent's copy. <code>/bin/echo</code> has the <strong>same PID as the child that exec'd</strong>; code after a successful <code>execl</code> never runs.</div>
+
+    <h3><span class="hx">2</span>open / write / close <span class="muted" style="font-size:14px;font-weight:400">— run it in the File lab</span></h3>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">char teststr[] = "The quick brown fox jumps over the lazy dog.\n";   /* 45 bytes */
+
+int main() {
+    int fd = open("testfile", O_WRONLY | O_CREAT, 0600);
+    if (fd &lt; 0) { perror("File open failed"); exit(1); }
+    printf("Attempting to write %d bytes\n", strlen(teststr));   /* 45 */
+    ssize_t r = write(fd, teststr, strlen(teststr));            /* writes 45 */
+    printf("Wrote %d bytes\n", (int) r);
+    close(fd);
+    return 0;
+}</code></pre></div>
+    <div class="hints"><button class="btn sm cyan" onclick="go(4);setTimeout(function(){flPreset('ex2');},420)">Open in the File lab ›</button><button class="reveal-btn ac" onclick="toggleHint(this,'e2x')">Reveal the explanation</button></div>
+    <div class="hint-body" id="e2x" style="border-left-color:var(--ac)"><span class="hl" style="color:var(--ac2)">What happened</span>It creates (or opens) <code>testfile</code> with permission <code>0600</code>, writes the 45-byte string, and prints <code>Attempting to write 45 bytes</code> then <code>Wrote 45 bytes</code>. Besides <code>O_WRONLY</code> you can open with <code>O_RDONLY</code> or <code>O_RDWR</code>. <code>open</code> returns a non-negative <strong>file descriptor</strong> on success, or <span class="ret neg">-1</span> on failure.</div>
+
+    <h3><span class="hx">3</span>Two writes with lseek <span class="muted" style="font-size:14px;font-weight:400">— the “50, not 90” one</span></h3>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C · snippet</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">r   = write(fd, teststr, len);   /* 1st write: bytes 0..44  -&gt; file is 45 bytes */
+off = lseek(fd, 5, SEEK_SET);    /* move the offset back to byte 5 */
+r   = write(fd, teststr, len);   /* 2nd write: bytes 5..49  -&gt; file is 50 bytes */
+close(fd);</code></pre></div>
+    <div class="hints"><button class="btn sm cyan" onclick="go(4);setTimeout(function(){flPreset('ex3');},420)">Run it in the File lab ›</button><button class="reveal-btn ac" onclick="toggleHint(this,'e3x')">Reveal the explanation</button></div>
+    <div class="hint-body" id="e3x" style="border-left-color:var(--ac)"><span class="hl" style="color:var(--ac2)">What happened</span>The first write fills bytes 0..44 (file = 45). <code>lseek(fd, 5, SEEK_SET)</code> moves the offset <strong>back to byte 5</strong>, so the second write <strong>overwrites bytes 5–44</strong> and extends the file only to byte 49 — final size <strong>50 bytes, not 90</strong>. Besides <code>SEEK_SET</code> there are <code>SEEK_CUR</code> and <code>SEEK_END</code>.</div>
+
+    <h3><span class="hx">4</span>chdir then execl <span class="muted" style="font-size:14px;font-weight:400">— step it</span></h3>
+    <div class="code"><div class="chead"><span class="lang"><span class="dot">●</span>C</span><button class="copybtn" onclick="copyCode(this)">Copy</button></div><pre><code data-lang="c">int main() {
+    int r = chdir("..");                       /* go up one directory */
+    if (r &lt; 0) { perror("Eek!"); exit(1); }
+    r = execl("/bin/ls", "/bin/ls", NULL);     /* becomes ls, lists the parent dir */
+    perror("Double eek!");   /* only runs if execl fails */
+    return 0;
+}</code></pre></div>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Step it</span> chdir + execl</div><div style="display:flex;gap:7px"><button class="btn sm" id="ex4Btn" onclick="ex4Step()">Step ›</button><button class="btn ghost sm" onclick="ex4Reset()">Reset</button></div></div>
+      <div class="sim-body"><div class="statrow"><div class="stat" style="min-width:220px"><span class="sv" id="ex4Cwd" style="font-size:15px">/home/student/oslab</span><span class="sl">process current directory</span></div></div>
+        <div class="console" id="ex4Out" style="min-height:84px"></div>
+        <p class="stepnote" id="ex4Note">Step through to see <code>chdir</code> change <em>this process's</em> directory, then <code>execl</code> replace it with <code>ls</code>.</p></div></div>
+    <div class="hints"><button class="reveal-btn ac" onclick="toggleHint(this,'e4x')">Reveal the explanation</button></div>
+    <div class="hint-body" id="e4x" style="border-left-color:var(--ac)"><span class="hl" style="color:var(--ac2)">What happened</span>It changes the process's own directory <strong>up one level</strong>, then replaces itself with <code>/bin/ls</code>, listing that parent directory. After it runs, the <strong>shell's</strong> directory is unchanged — <code>chdir</code> affects only the calling process. <code>"Double eek!"</code> prints only if <code>execl</code> fails.</div>
+  </section>
+
+  <!-- 8 PRACTICE -->
+  <section class="slide" data-title="Practice">
+    <div class="eyebrow">08 · Practice problems</div>
+    <h2>Practice — Yours to Write</h2>
+    <p class="sub">Each task includes <strong>progressive hints</strong>. Attempt the problem first, then reveal the hints one at a time. The solution itself is left for you to write.</p>
+    <h3><span class="hx">1</span>Task 1 — append strings to a file</h3>
+    <div class="problem-stmt"><span class="pl">Statement.</span> Open a file given as a command-line argument, then repeatedly ask the user for strings to write to it. Keep going until the user enters <code>-1</code>. Create the file if it doesn't exist.</div>
+    <div class="hints"><button class="reveal-btn" onclick="toggleHint(this,'p1h1')">Hint 1</button><button class="reveal-btn" onclick="toggleHint(this,'p1h2')">Hint 2</button><button class="reveal-btn" onclick="toggleHint(this,'p1h3')">Hint 3</button></div>
+    <div class="hint-body" id="p1h1"><span class="hl">Hint 1</span>The filename is <code>argv[1]</code> (check <code>argc &gt;= 2</code>). Open with <code>O_WRONLY | O_CREAT | O_APPEND</code>, mode <code>0644</code>.</div>
+    <div class="hint-body" id="p1h2"><span class="hl">Hint 2</span>Loop: read a line with <code>fgets</code>, compare with <code>strcmp(buffer, "-1")</code> (mind the trailing newline), break when it matches.</div>
+    <div class="hint-body" id="p1h3"><span class="hl">Hint 3</span>Write each accepted string with <code>write(fd, buffer, strlen(buffer))</code>; <code>close(fd)</code> after the loop.</div>
+    <h3><span class="hx">2</span>Task 2 — ordered grandchild / child / parent</h3>
+    <div class="problem-stmt"><span class="pl">Statement.</span> Create a child and a grandchild. Each prints a line, but force the output order: <code>I am grandchild</code>, <code>I am child</code>, <code>I am parent</code>.</div>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Build it</span> Force the order with wait()</div><button class="btn ghost sm" onclick="t2Reset()">Reset</button></div>
+      <div class="sim-body"><div class="sim-controls"><button class="btn sm" onclick="t2Step()">Next step ›</button></div>
+        <div class="console" id="t2Out" style="min-height:84px"></div>
+        <p class="stepnote" id="t2Note">Step through: the deepest process prints first because each ancestor <code>wait()</code>s for its descendant before printing.</p></div></div>
+    <div class="hints"><button class="reveal-btn" onclick="toggleHint(this,'p2h1')">Hint 1</button><button class="reveal-btn" onclick="toggleHint(this,'p2h2')">Hint 2</button><button class="reveal-btn" onclick="toggleHint(this,'p2h3')">Hint 3</button></div>
+    <div class="hint-body" id="p2h1"><span class="hl">Hint 1</span>Nest the forks: parent forks the child; <strong>inside the child's branch</strong>, fork again for the grandchild.</div>
+    <div class="hint-body" id="p2h2"><span class="hl">Hint 2</span>Use <code>wait()</code> so each ancestor waits for its descendant before printing.</div>
+    <div class="hint-body" id="p2h3"><span class="hl">Hint 3</span>Grandchild prints immediately; child <code>wait()</code>s then prints; parent <code>wait()</code>s then prints.</div>
+    <h3><span class="hx">3</span>Task 3 — odd-PID forks &amp; counting</h3>
+    <div class="problem-stmt"><span class="pl">Statement.</span> Given <code>a=fork(); b=fork(); c=fork();</code>, check each child's PID and if it is odd, that process forks again. Print how many processes were created.</div>
+    <div class="hints"><button class="reveal-btn" onclick="toggleHint(this,'p3h1')">Hint 1</button><button class="reveal-btn" onclick="toggleHint(this,'p3h2')">Hint 2</button><button class="reveal-btn" onclick="toggleHint(this,'p3h3')">Hint 3</button></div>
+    <div class="hint-body" id="p3h1"><span class="hl">Hint 1</span>Three sequential forks alone make <strong>2³ = 8</strong> processes — use the fork program simulator in Section 5 to see it.</div>
+    <div class="hint-body" id="p3h2"><span class="hl">Hint 2</span>Capture each fork's return: <code>pid = fork(); if (pid &gt; 0 &amp;&amp; pid % 2 == 1) { fork(); }</code>.</div>
+    <div class="hint-body" id="p3h3"><span class="hl">Hint 3</span>Memory isn't shared after fork — a counter is copied, not shared. Have <strong>each process print one line</strong> (with <code>getpid()</code>) and count the lines.</div>
+    <h3><span class="hx">4</span>Task 4 — sort.c, oddeven.c, and a split</h3>
+    <div class="problem-stmt"><span class="pl">Statement.</span> Write <code>sort.c</code> (prints args sorted descending) and <code>oddeven.c</code> (prints odd/even for each arg). Then a program where the <strong>child sorts</strong> the array and the <strong>parent prints odd/even</strong>.</div>
+    <div class="hints"><button class="reveal-btn" onclick="toggleHint(this,'p4h1')">Hint 1</button><button class="reveal-btn" onclick="toggleHint(this,'p4h2')">Hint 2</button><button class="reveal-btn" onclick="toggleHint(this,'p4h3')">Hint 3</button></div>
+    <div class="hint-body" id="p4h1"><span class="hl">Hint 1</span>Read numbers with <code>atoi(argv[i])</code> for <code>i = 1 .. argc-1</code> into an <code>int</code> array.</div>
+    <div class="hint-body" id="p4h2"><span class="hl">Hint 2</span>Declare the array in the parent, <code>fork()</code>, put sorting in the child branch and odd/even in the parent branch. <code>wait()</code> so output doesn't interleave.</div>
+    <div class="hint-body" id="p4h3"><span class="hl">Hint 3</span>To <em>exec</em> the helpers instead, convert ints to strings and use <code>execv</code> with a <code>char *argv[]</code> array (easier than <code>execl</code> for variable counts).</div>
+    <h3><span class="hx">5</span>Task 5 — one child, three grandchildren</h3>
+    <div class="problem-stmt"><span class="pl">Statement.</span> The parent creates one child and three grandchildren, and prints their IDs.</div>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Build it</span> Construct the required tree</div><button class="btn ghost sm" onclick="t5Reset()">Reset</button></div>
+      <div class="sim-body"><div class="sim-controls"><button class="btn sm" onclick="t5ForkChild()">parent: fork() the child</button><button class="btn sm cyan" onclick="t5ForkGrand()">child: fork() a grandchild</button></div>
+        <div class="ptree-wrap"><svg id="t5Svg" class="ptree" role="img" aria-label="Task 5 tree builder"></svg></div>
+        <p class="stepnote" id="t5Note">Goal: <b>parent → child → three grandchildren</b>. Only the <b>child</b> forks the grandchildren — and they must <b>not</b> keep forking.</p></div></div>
+    <div class="hints"><button class="reveal-btn" onclick="toggleHint(this,'p5h1')">Hint 1</button><button class="reveal-btn" onclick="toggleHint(this,'p5h2')">Hint 2</button><button class="reveal-btn" onclick="toggleHint(this,'p5h3')">Hint 3</button></div>
+    <div class="hint-body" id="p5h1"><span class="hl">Hint 1</span>The parent forks once for the child. The <strong>child</strong> forks <strong>three times</strong>. Make sure grandchildren do <strong>not</strong> keep forking.</div>
+    <div class="hint-body" id="p5h2"><span class="hl">Hint 2</span>In the child: <code>for (i=0;i&lt;3;i++) { pid=fork(); if (pid==0) { printf(...); break; } }</code> — the <code>break</code> stops each grandchild spawning more.</div>
+    <div class="hint-body" id="p5h3"><span class="hl">Hint 3</span>Use <code>getpid()</code> / <code>getppid()</code> to print IDs, and <code>wait()</code> for clean ordering.</div>
+  </section>
+
+  <!-- 9 RECAP -->
+  <section class="slide" data-title="Recap">
+    <div class="eyebrow">09 · Recap</div>
+    <h2>Recap &amp; Reminders</h2>
+    <p class="sub">This session covered navigating Linux, compiling C, working with file descriptors, and creating processes. A short summary follows.</p>
+    <div class="grid c2">
+      <div class="card"><div class="eyebrow" style="margin-bottom:12px">The concepts</div><ul style="margin:0">
+        <li><strong>System call</strong> — asking the OS to do something privileged.</li>
+        <li><strong>open / read / write / lseek / close</strong> — the file I/O workflow.</li>
+        <li><strong>fork()</strong> — creates a child; <strong>returns twice</strong> (0 / child PID).</li>
+        <li><strong>wait()</strong> — parent waits for a child; collects <strong>zombies</strong>.</li>
+        <li><strong>exec()</strong> — replaces the program image; <strong>no return on success</strong>.</li>
+      </ul></div>
+      <div class="card" style="background:var(--acdim);border-color:var(--acline)"><div class="eyebrow" style="margin-bottom:12px">Before you leave</div><ul style="margin:0">
+        <li>Finish the basic <strong>C / Linux self-study</strong>.</li>
+        <li>Make sure your Linux environment <strong>compiles and runs C</strong>.</li>
+        <li>Submissions go through <strong>Google Forms</strong>.</li>
+        <li>Term-project announcements are in the <strong>Slack channel</strong>.</li>
+      </ul></div>
+    </div>
+    <div class="note ok"><span class="h">Practising on your own</span>This deck runs entirely offline, so you can reopen it at any time. To review, recompile a program in Section 2, replay the file presets in Section 4, and rebuild the process trees in Section 5.</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px"><button class="start-btn" onclick="go(5)">Back to the Process lab</button><button class="start-btn ghost" onclick="go(2)">Back to the C editor</button></div>
+  </section>
+
+  <!-- INSERT_SECTIONS -->
+</main>
+
+<footer class="bottomnav">
+  <button class="navbtn ghost" id="prev" onclick="go(cur-1)">‹ Prev</button>
+  <div class="ndots" id="ndots" aria-hidden="true"></div>
+  <button class="navbtn" id="next" onclick="go(cur+1)">Next ›</button>
+</footer>
+
+<script>
+  "use strict";
+  var SVGNS="http://www.w3.org/2000/svg";
+  function svg(t,a){var e=document.createElementNS(SVGNS,t);if(a)for(var k in a)e.setAttribute(k,a[k]);return e;}
+  function el(id){return document.getElementById(id);}
+  function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+  /* ---- highlight ---- */
+  var C_KW=new Set(["int","char","void","return","if","else","for","while","do","static","struct","unsigned","signed","long","short","double","float","const","sizeof","break","continue","switch","case","default","main","pid_t","ssize_t","off_t","size_t","FILE"]);
+  var C_FN=new Set(["open","read","write","close","lseek","fork","wait","waitpid","exec","execl","execv","execlp","execvp","getpid","getppid","printf","perror","strlen","strcmp","fgets","atoi","chdir","exit","malloc"]);
+  function isIdS(c){return /[A-Za-z_]/.test(c);} function isId(c){return /[A-Za-z0-9_]/.test(c);}
+  function hlC(code){var i=0,n=code.length,o="";while(i<n){var c=code[i];
+    if(c==="/"&&code[i+1]==="/"){var j=code.indexOf("\n",i);if(j<0)j=n;o+='<span class="c-com">'+esc(code.slice(i,j))+"</span>";i=j;continue;}
+    if(c==="/"&&code[i+1]==="*"){var k=code.indexOf("*/",i+2);k=(k<0)?n:k+2;o+='<span class="c-com">'+esc(code.slice(i,k))+"</span>";i=k;continue;}
+    if(c==="#"){var p=code.indexOf("\n",i);if(p<0)p=n;o+='<span class="c-pre">'+esc(code.slice(i,p))+"</span>";i=p;continue;}
+    if(c==='"'){var q=i+1;while(q<n&&!(code[q]==='"'&&code[q-1]!=="\\"))q++;q=Math.min(q+1,n);o+='<span class="c-str">'+esc(code.slice(i,q))+"</span>";i=q;continue;}
+    if(c==="'"){var e=i+1;while(e<n&&e<i+6&&!(code[e]==="'"&&code[e-1]!=="\\"))e++;if(e<n&&code[e]==="'"){o+='<span class="c-str">'+esc(code.slice(i,e+1))+"</span>";i=e+1;continue;}o+=esc(c);i++;continue;}
+    if(/[0-9]/.test(c)&&!(i>0&&isId(code[i-1]))){var m=i;while(m<n&&/[0-9a-fA-FxX]/.test(code[m]))m++;o+='<span class="c-num">'+esc(code.slice(i,m))+"</span>";i=m;continue;}
+    if(isIdS(c)){var w=i;while(w<n&&isId(code[w]))w++;var wd=code.slice(i,w),cl="";if(C_KW.has(wd))cl="c-kw";else if(C_FN.has(wd))cl="c-fn";o+=cl?'<span class="'+cl+'">'+esc(wd)+"</span>":esc(wd);i=w;continue;}
+    o+=esc(c);i++;}return o;}
+  function hlBash(code){return code.split("\n").map(function(ln){var hi=ln.indexOf("#");var cp=hi>=0?ln.slice(0,hi):ln,cm=hi>=0?ln.slice(hi):"";var o="",i=0;while(i<cp.length){if(cp[i]==='"'){var j=i+1;while(j<cp.length&&cp[j]!=='"')j++;j=Math.min(j+1,cp.length);o+='<span class="c-str">'+esc(cp.slice(i,j))+"</span>";i=j;}else{o+=esc(cp[i]);i++;}}return o+(cm?'<span class="c-com">'+esc(cm)+"</span>":"");}).join("\n");}
+  function hlAll(root){(root||document).querySelectorAll("code[data-lang]").forEach(function(c){if(c.dataset.hl)return;var raw=c.textContent;c.setAttribute("data-raw",raw);var lg=c.getAttribute("data-lang");if(lg==="c")c.innerHTML=hlC(raw);else if(lg==="bash")c.innerHTML=hlBash(raw);c.dataset.hl="1";});}
+
+  /* ---- copy + hints ---- */
+  function copyCode(btn){var c=btn.closest(".code").querySelector("code");var t=c.getAttribute("data-raw");if(t==null)t=c.textContent;
+    function done(){btn.textContent="Copied";btn.classList.add("ok");setTimeout(function(){btn.textContent="Copy";btn.classList.remove("ok");},1300);}
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done).catch(function(){fb(t,done);});else fb(t,done);}
+  function fb(t,done){var a=document.createElement("textarea");a.value=t;a.setAttribute("readonly","");a.style.position="fixed";a.style.left="-9999px";document.body.appendChild(a);a.focus();a.select();try{document.execCommand("copy");done();}catch(e){}document.body.removeChild(a);}
+  function toggleHint(btn,id){var b=el(id);var s=b.classList.toggle("show");btn.classList.toggle("active",s);}
+
+  /* ===== PTree engine ===== */
+  function PTree(){this.nodes={};this.root=null;this.seq=0;}
+  PTree.prototype.add=function(pid,o){var id="n"+(this.seq++);var nd={id:id,parent:pid,children:[],x:0,depth:0};if(o)for(var k in o)nd[k]=o[k];this.nodes[id]=nd;if(pid==null)this.root=id;else this.nodes[pid].children.push(id);return id;};
+  PTree.prototype.layout=function(){var s=this,leaf=0,mx=0;(function rec(id,d){var nd=s.nodes[id];nd.depth=d;if(d>mx)mx=d;if(nd.children.length===0){nd.x=leaf++;}else{nd.children.forEach(function(c){rec(c,d+1);});nd.x=(s.nodes[nd.children[0]].x+s.nodes[nd.children[nd.children.length-1]].x)/2;}})(this.root,0);this.leafCount=Math.max(leaf,1);this.maxDepth=mx;};
+  PTree.prototype.render=function(sv,o){o=o||{};this.layout();var colW=o.colW||92,rowH=o.rowH||100,nW=o.nodeW||80,nH=44,mxg=18,myg=16;
+    var W=this.leafCount*colW+mxg*2-(colW-nW),H=(this.maxDepth+1)*rowH+myg;sv.setAttribute("viewBox","0 0 "+W+" "+H);sv.setAttribute("width","100%");sv.style.maxWidth=W+"px";sv.innerHTML="";
+    var s=this;function px(nd){return mxg+nd.x*colW+nW/2;}function py(nd){return myg+nd.depth*rowH;}
+    Object.keys(this.nodes).forEach(function(id){var nd=s.nodes[id];nd.children.forEach(function(cid){var c=s.nodes[cid];var x1=px(nd),y1=py(nd)+nH,x2=px(c),y2=py(c),md=(y1+y2)/2;sv.appendChild(svg("path",{class:"edge",d:"M"+x1+","+y1+" C"+x1+","+md+" "+x2+","+md+" "+x2+","+y2}));});});
+    Object.keys(this.nodes).forEach(function(id){var nd=s.nodes[id];var gx=mxg+nd.x*colW,gy=py(nd);
+      var cl="pn "+(nd.cls||(nd.leaf?"node-leaf":"node-int"))+(nd._new?" enter":"")+(nd.pulse?" pulse":"")+(o.clickable?" clk":"")+(nd.sel?" sel":"");
+      var g=svg("g",{class:cl});if(o.clickable&&o.onclick){(function(i2){g.style.cursor="pointer";g.addEventListener("click",function(){o.onclick(i2);});})(id);}
+      g.appendChild(svg("rect",{class:"node-box",x:gx,y:gy,width:nW,height:nH,rx:9}));
+      var t1=svg("text",{x:gx+nW/2,y:gy+(nd.sub?19:27),"text-anchor":"middle",class:"nlabel","font-size":12.5});t1.textContent=nd.label||"proc";g.appendChild(t1);
+      if(nd.sub){var t2=svg("text",{x:gx+nW/2,y:gy+34,"text-anchor":"middle",class:"nsub","font-size":10.5});t2.textContent=nd.sub;g.appendChild(t2);}
+      sv.appendChild(g);nd._new=false;});};
+
+  /* ===== S1: filesystem navigator ===== */
+  var NV;
+  function nvReset(){NV={root:{name:"oslab",dirs:{},files:["hello.c"]},path:[]};el("nvOut").innerHTML='';nvLine("dim","# type commands below — the tree updates as you go (try: mkdir src, cd src, touch main.c)");nvDraw();}
+  function nvNode(){var n=NV.root;for(var i=0;i<NV.path.length;i++)n=n.dirs[NV.path[i]];return n;}
+  function nvLine(cls,t){var o=el("nvOut");var d=document.createElement("div");if(cls)d.className=cls;d.textContent=t;o.appendChild(d);o.scrollTop=o.scrollHeight;}
+  function nvEcho(cmd){var o=el("nvOut");var d=document.createElement("div");d.innerHTML='<span class="pr">'+nvPrompt()+'</span> <span class="cm">'+esc(cmd)+'</span>';o.appendChild(d);o.scrollTop=o.scrollHeight;}
+  function nvPrompt(){return "~/oslab"+(NV.path.length?"/"+NV.path.join("/"):"")+" $";}
+  function nvRun(cmd){cmd=cmd.trim();if(!cmd)return;nvEcho(cmd);var p=cmd.split(/\s+/),c=p[0],a=p[1],n=nvNode();
+    if(c==="pwd"){nvLine("","/home/student/oslab"+(NV.path.length?"/"+NV.path.join("/"):""));}
+    else if(c==="ls"){var items=Object.keys(n.dirs).map(function(d){return d+"/";}).concat(n.files);nvLine("",items.length?items.join("  "):"(empty)");}
+    else if(c==="mkdir"){if(!a){nvLine("er","mkdir: missing operand");}else if(n.dirs[a]||n.files.indexOf(a)>=0){nvLine("er","mkdir: cannot create '"+a+"': File exists");}else{n.dirs[a]={name:a,dirs:{},files:[]};}}
+    else if(c==="touch"){if(!a){nvLine("er","touch: missing operand");}else if(n.files.indexOf(a)<0&&!n.dirs[a]){n.files.push(a);}}
+    else if(c==="rmdir"){if(n.dirs[a])delete n.dirs[a];else nvLine("er","rmdir: '"+a+"': No such directory");}
+    else if(c==="rm"){var ix=n.files.indexOf(a);if(ix>=0)n.files.splice(ix,1);else nvLine("er","rm: '"+a+"': No such file");}
+    else if(c==="cd"){if(!a||a==="~"){NV.path=[];}else if(a===".."){if(NV.path.length)NV.path.pop();}else if(n.dirs[a]){NV.path.push(a);}else{nvLine("er","cd: "+a+": No such file or directory");}}
+    else if(c==="tree"){nvLine("ac","oslab/");nvTreeLines(NV.root,"");}
+    else if(c==="clear"){el("nvOut").innerHTML="";}
+    else if(c==="help"){nvLine("dim","pwd · ls · cd <dir> · cd .. · mkdir <d> · touch <f> · rm <f> · rmdir <d> · tree · clear");}
+    else{nvLine("er","bash: "+c+": command not found");}
+    nvDraw();}
+  function nvTreeLines(node,pre){var dirs=Object.keys(node.dirs),all=dirs.map(function(d){return{t:"d",n:d};}).concat(node.files.map(function(f){return{t:"f",n:f};}));all.forEach(function(it,i){var last=i===all.length-1;nvLine("",pre+(last?"└─ ":"├─ ")+it.n+(it.t==="d"?"/":""));if(it.t==="d")nvTreeLines(node.dirs[it.n],pre+(last?"   ":"│  "));});}
+  function nvDraw(){var box=el("nvTree");var html="";function walk(node,depth,cur){var pad="&nbsp;&nbsp;".repeat(depth);var isCur=cur;html+='<div class="'+(isCur?"cur":"d")+'">'+pad+(depth?"├─ ":"")+esc(node.name)+"/"+(isCur?"  ←":"")+"</div>";Object.keys(node.dirs).forEach(function(d){walk(node.dirs[d],depth+1,sameDir(node.dirs[d]));});node.files.forEach(function(f){html+='<div class="f">'+"&nbsp;&nbsp;".repeat(depth+1)+"├─ "+esc(f)+"</div>";});}
+    function sameDir(node){return node===nvNode();}walk(NV.root,0,nvNode()===NV.root);box.innerHTML=html;}
+  function nvChips(){var r=el("nvChips");r.innerHTML="";["ls","mkdir src","cd src","touch main.c","pwd","cd ..","tree"].forEach(function(c){var b=document.createElement("button");b.className="cmdchip";b.textContent=c;b.onclick=function(){nvRun(c);};r.appendChild(b);});}
+
+  /* ===== S2: C editor + terminal + printf + errors ===== */
+  var PROGRAMS={
+    hello:"#include <stdio.h>\n\nint main() {\n    printf(\"Hello, World!\\n\");\n    return 0;\n}",
+    name:"#include <stdio.h>\n\nint main() {\n    char *name = \"oslab\";\n    printf(\"Hello, %s!\\n\", name);\n    return 0;\n}",
+    two:"#include <stdio.h>\n\nint main() {\n    printf(\"Line one\\n\");\n    printf(\"Line two\\n\");\n    return 0;\n}",
+    buggy:"#include <stdio.h>\n\nint main() {\n    printf(\"Missing a semicolon\\n\")\n    return 0;\n}"
+  };
+  var PROG_LABEL={hello:"Hello World",name:"With a name",two:"Two lines",buggy:"Buggy (fix it!)"};
+  var vfs;
+  function codeReset(){el("cEditor").value=PROGRAMS.hello;termReset();buildProgLoader("hello");}
+  function buildProgLoader(active){var r=el("progLoader");r.innerHTML="";Object.keys(PROGRAMS).forEach(function(k){var b=document.createElement("button");b.className="opt2"+(k===active?" on":"");b.textContent=PROG_LABEL[k];b.onclick=function(){el("cEditor").value=PROGRAMS[k];r.querySelectorAll(".opt2").forEach(function(x){x.classList.remove("on");});b.classList.add("on");termReset();};r.appendChild(b);});}
+  function termReset(){vfs={files:["hello.c"],compiled:false};el("termOut").innerHTML="";tLine("dim","# edit hello.c above, then: gcc hello.c -o hello  →  ./hello   (type help)");}
+  function tLine(cls,t){var o=el("termOut");var d=document.createElement("div");if(cls)d.className=cls;d.textContent=t;o.appendChild(d);o.scrollTop=o.scrollHeight;}
+  function tEcho(cmd){var o=el("termOut");var d=document.createElement("div");d.innerHTML='<span class="pr">student@oslab:~/oslab$</span> <span class="cm">'+esc(cmd)+'</span>';o.appendChild(d);o.scrollTop=o.scrollHeight;}
+  function unesc(s){return s.replace(/\\n/g,"\n").replace(/\\t/g,"\t").replace(/\\"/g,'"').replace(/\\\\/g,"\\");}
+  function compileC(src){var errs=[],warns=[],lines=src.split("\n");function lineOf(re){for(var i=0;i<lines.length;i++)if(re.test(lines[i]))return i+1;return 1;}
+    if(/printf\s*\(/.test(src)&&!/#\s*include\s*<\s*stdio\.h\s*>/.test(src))warns.push("hello.c:"+lineOf(/printf/)+": warning: implicit declaration of function 'printf'");
+    if(!/\bmain\s*\(/.test(src))errs.push("hello.c: error: undefined reference to 'main'");
+    lines.forEach(function(ln,i){var t=ln.trim();if(/^(printf|return|[a-zA-Z_][\w ]*\*?\s*\w+\s*=)/.test(t)&&t.length&&!/[;{}]$/.test(t)&&!/,$/.test(t)&&!/^(int|void|char)\s+main/.test(t)&&!/^(if|else|for|while|switch)\b/.test(t))errs.push("hello.c:"+(i+1)+": error: expected ';' before end of statement");});
+    var ob=(src.match(/{/g)||[]).length,cb=(src.match(/}/g)||[]).length;if(ob>cb)errs.push("hello.c:"+lines.length+": error: expected '}' at end of input");
+    return {errs:errs,warns:warns};}
+  function splitArgs(str){var r=[],cur="",inq=false,q="",depth=0;for(var i=0;i<str.length;i++){var ch=str[i];if(inq){cur+=ch;if(ch===q&&str[i-1]!=="\\")inq=false;continue;}if(ch==='"'||ch==="'"){inq=true;q=ch;cur+=ch;continue;}if(ch==="(")depth++;else if(ch===")")depth--;if(ch===","&&depth===0){r.push(cur);cur="";continue;}cur+=ch;}if(cur.trim()!=="")r.push(cur);return r;}
+  function resolveArg(a,vars,sp){a=a.trim().replace(/^\(\s*[A-Za-z_]\w*\s*\)\s*/,"").trim();
+    if(/^".*"$/.test(a))return unesc(a.slice(1,-1));
+    if(/^'.*'$/.test(a))return unesc(a.slice(1,-1));
+    var v=/^-?\d+(\.\d+)?$/.test(a)?a:(vars[a]!=null?vars[a]:null);
+    if(v!=null){if(/f/.test(sp))return parseFloat(v).toFixed(6);if(/[xX]/.test(sp)){var h=(parseInt(v,10)||0).toString(16);return /X/.test(sp)?h.toUpperCase():h;}return String(v);}
+    return a;}
+  function runOut(src){var vars={},m;
+    var sre=/\bchar\s+\*?\s*([A-Za-z_]\w*)\s*(?:\[\s*\])?\s*=\s*"((?:[^"\\]|\\.)*)"/g;while((m=sre.exec(src)))vars[m[1]]=unesc(m[2]);
+    var ire=/\b(?:int|long|short|unsigned|float|double)\s+([A-Za-z_]\w*)\s*=\s*(-?[0-9.]+)/g;while((m=ire.exec(src)))vars[m[1]]=m[2];
+    var cre=/\bchar\s+([A-Za-z_]\w*)\s*=\s*'(\\?.)'/g;while((m=cre.exec(src)))vars[m[1]]=unesc(m[2]);
+    var o=[],i=0;
+    while(true){var idx=src.indexOf("printf",i);if(idx<0)break;var p=src.indexOf("(",idx);if(p<0)break;var depth=0,j=p,inq=false,q="";for(;j<src.length;j++){var ch=src[j];if(inq){if(ch===q&&src[j-1]!=="\\")inq=false;continue;}if(ch==='"'||ch==="'"){inq=true;q=ch;continue;}if(ch==="(")depth++;else if(ch===")"){depth--;if(depth===0)break;}}var inner=src.slice(p+1,j);i=j+1;var args=splitArgs(inner);if(!args.length)continue;var fm=args[0].trim().match(/^"((?:[^"\\]|\\.)*)"$/);if(!fm)continue;var rest=args.slice(1),ai=0;var s=unesc(fm[1]).replace(/%[-0-9.]*[dscxXofu]/g,function(sp){var a=rest[ai++];return a==null?sp:resolveArg(a,vars,sp);}).replace(/%%/g,"%");o.push(s);}
+    return o.join("");}
+  function termRun(cmd){cmd=cmd.trim();if(!cmd)return;tEcho(cmd);var p=cmd.split(/\s+/);
+    if(cmd==="help"){tLine("dim","gcc hello.c -o hello | ./hello | gcc --version | ls | pwd | cat hello.c | clear");return;}
+    if(cmd==="clear"){el("termOut").innerHTML="";return;}
+    if(cmd==="gcc --version"){tLine("","gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0");return;}
+    if(cmd==="pwd"){tLine("","/home/student/oslab");return;}
+    if(cmd==="ls"){tLine("",vfs.files.join("  "));return;}
+    if(cmd==="cat hello.c"){el("cEditor").value.split("\n").forEach(function(l){tLine("",l);});return;}
+    if(p[0]==="nano"){tLine("dim","[ edit the file in the box above instead ]");return;}
+    if(/^gcc\s+hello\.c\s+-o\s+\S+/.test(cmd)){var out=p[p.length-1],res=compileC(el("cEditor").value);res.warns.forEach(function(w){tLine("wr",w);});if(res.errs.length){res.errs.forEach(function(e){tLine("er",e);});tLine("dim","compilation failed — fix the error(s) and recompile");vfs.compiled=false;return;}vfs.compiled=true;if(vfs.files.indexOf(out)<0)vfs.files.push(out);vfs._exe=out;tLine("ac","(compiled → ./"+out+")");return;}
+    if(/^\.\/\S+/.test(cmd)){var nm=cmd.slice(2);if(vfs.compiled&&(nm===vfs._exe||nm==="hello")){var o=runOut(el("cEditor").value);if(o)tLine("",o.replace(/\n$/,""));else tLine("dim","(no output)");}else tLine("er","bash: "+cmd+": No such file or directory");return;}
+    tLine("er","bash: "+p[0]+": command not found");}
+  function termChips(){var r=el("termChips");r.innerHTML="";["gcc hello.c -o hello","./hello","ls","gcc --version","help"].forEach(function(c){var b=document.createElement("button");b.className="cmdchip";b.textContent=c;b.onclick=function(){termRun(c);};r.appendChild(b);});}
+  var PF=[
+    {s:"%d",t:"a whole number (integer)",ex:'printf("count = %d\\n", 42);',out:"count = 42"},
+    {s:"%s",t:"a string of characters",ex:'printf("name = %s\\n", "oslab");',out:"name = oslab"},
+    {s:"%c",t:"a single character",ex:"printf(\"grade = %c\\n\", 'A');",out:"grade = A"},
+    {s:"%f",t:"a floating-point number",ex:'printf("pi = %f\\n", 3.14);',out:"pi = 3.140000"},
+    {s:"%x",t:"an integer in hexadecimal",ex:'printf("value = %x\\n", 255);',out:"value = ff"},
+    {s:"%%",t:"a literal percent sign",ex:'printf("battery 100%%\\n");',out:"battery 100%"},
+    {s:"\\n",t:"newline escape sequence",ex:'printf("line one\\nline two\\n");',out:"line one\nline two"},
+    {s:"\\t",t:"tab escape sequence",ex:'printf("name\\tmark\\n");',out:"name\tmark"}
+  ];
+  function buildPf(){var b=el("pfList");b.innerHTML="";PF.forEach(function(p,i){var x=document.createElement("button");x.className="pickbtn"+(i===0?" on":"");x.innerHTML='<span style="font-family:var(--mono);font-size:16px;color:var(--cnum);font-weight:700">'+p.s+'</span><small>'+p.t+'</small>';x.onclick=function(){b.querySelectorAll(".pickbtn").forEach(function(y){y.classList.remove("on");});x.classList.add("on");pfShow(p);};b.appendChild(x);});pfShow(PF[0]);}
+  function pfShow(p){el("pfExplain").innerHTML='<div class="docmeta"><span style="color:var(--cnum);font-size:13px">'+p.s+'</span> &nbsp; '+p.t+'</div><div class="dk" style="margin-top:9px">Example</div><div class="docsig" style="margin-bottom:0">'+esc(p.ex)+'</div><div class="dk" style="margin-top:11px">Output</div><div class="console" style="min-height:0;padding:10px 12px">'+esc(p.out)+'</div>';}
+  var ERRS=[
+    {k:"command not found: gcc",t:"The compiler isn't installed. Run <code>sudo apt update &amp;&amp; sudo apt install build-essential</code>, then check with <code>gcc --version</code>."},
+    {k:"Permission denied",t:"You ran the program without <code>./</code>. Use <code>./hello</code> — the <code>./</code> means run the program in this directory."},
+    {k:"No such file or directory",t:"Wrong filename or folder. List files with <code>ls</code> and confirm you compiled to that exact name."},
+    {k:"implicit declaration",t:"You used a function (e.g. <code>printf</code>) without its header. Add <code>#include &lt;stdio.h&gt;</code> at the top."},
+    {k:"expected ';'",t:"A statement is missing its semicolon. gcc points at the line — add the <code>;</code> at the end of that statement."},
+    {k:"undefined reference to 'main'",t:"There is no <code>main()</code> function, or it's misspelled. Every C program needs <code>int main()</code>."}
+  ];
+  function buildErrExplorer(){var b=el("errExplorer");b.innerHTML="";ERRS.forEach(function(e){var x=document.createElement("button");x.className="pickbtn";x.style.fontSize="12px";x.textContent=e.k;x.onclick=function(){b.querySelectorAll(".pickbtn").forEach(function(y){y.classList.remove("on");});x.classList.add("on");el("errExplain").innerHTML='<span class="et">'+esc(e.k)+'</span><br>'+e.t;};b.appendChild(x);});}
+
+  /* ===== Navigation ===== */
+  var slides=Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var total=slides.length,cur=0;
+  var pills=el("pills"),ndots=el("ndots"),bar=el("bar"),prevB=el("prev"),nextB=el("next"),ringfg=el("ringfg"),ringtxt=el("ringtxt"),RC=113.1;
+  function buildNav(){pills.innerHTML="";ndots.innerHTML="";slides=Array.prototype.slice.call(document.querySelectorAll(".slide"));total=slides.length;
+    slides.forEach(function(s,i){var b=document.createElement("button");b.className="pill";b.innerHTML='<span class="num">'+(i<10?"0"+i:i)+"</span>"+(s.getAttribute("data-title")||("S"+i));b.addEventListener("click",function(){go(i);});pills.appendChild(b);
+      var d=document.createElement("button");d.className="ndot";d.addEventListener("click",function(){go(i);});ndots.appendChild(d);});}
+  function render(){slides.forEach(function(s,i){s.classList.toggle("active",i===cur);});bar.style.width=((cur+1)/total*100)+"%";ringfg.setAttribute("stroke-dashoffset",(RC*(1-(cur+1)/total)).toFixed(1));ringtxt.textContent=(cur+1)+"/"+total;
+    Array.prototype.forEach.call(pills.children,function(p,i){p.classList.toggle("active",i===cur);});
+    Array.prototype.forEach.call(ndots.children,function(d,i){d.classList.toggle("active",i===cur);});
+    prevB.disabled=(cur===0);nextB.disabled=(cur===total-1);var ap=pills.children[cur];if(ap&&ap.scrollIntoView)ap.scrollIntoView({block:"nearest",inline:"center",behavior:"smooth"});window.scrollTo({top:0,behavior:"smooth"});}
+  function go(i){cur=Math.max(0,Math.min(total-1,i));render();}
+  window.go=go;window.copyCode=copyCode;window.toggleHint=toggleHint;
+  window.nvReset=nvReset;window.nvRun=nvRun;window.codeReset=codeReset;window.termReset=termReset;window.termRun=termRun;
+
+  document.addEventListener("keydown",function(e){var t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;if(e.key==="ArrowRight"||e.key==="PageDown"){go(cur+1);e.preventDefault();}else if(e.key==="ArrowLeft"||e.key==="PageUp"){go(cur-1);e.preventDefault();}else if(e.key==="Home"){go(0);e.preventDefault();}else if(e.key==="End"){go(total-1);e.preventDefault();}});
+  function bindInputs(){var ni=el("nvIn");if(ni&&!ni._b){ni._b=1;ni.addEventListener("keydown",function(e){if(e.key==="Enter"){nvRun(this.value);this.value="";}});}
+    var ti=el("termInput");if(ti&&!ti._b){ti._b=1;ti.addEventListener("keydown",function(e){if(e.key==="Enter"){termRun(this.value);this.value="";}});}}
+
+  function initAll(){
+    hlAll(document);buildNav();
+    nvChips();nvReset();
+    termChips();buildProgLoader("hello");codeReset();buildErrExplorer();buildPf();
+    scReset();buildCallExplorer();ukReset();buildStrace();var sp=el("scPick");if(sp&&!sp._b){sp._b=1;sp.addEventListener("change",scReset);}
+    flReset();permReset();
+    peReset();frRole("parent");buildFpsPresets();fpsReset();memReset();el("rcOut").innerHTML='<span class="dim">// press Run the program</span>';psReset();buildExecExplorer();
+    var fc=el("fpsCode");if(fc&&!fc._b){fc._b=1;fc.addEventListener("input",fpsReset);}
+    ex1Reset();ex4Reset();t2Reset();t5Reset();orpReset();
+    /* INIT_CALLS */
+    bindInputs();render();
+  }
+  /* ===== S3: syscall stepper ===== */
+  var SC={
+    write:{num:1,code:'n = write(1, "Hi", 2);',handler:'sys_write()',device:'terminal',regs:'<b>rax</b>=1 (write)  <b>rdi</b>=1  <b>rsi</b>="Hi"  <b>rdx</b>=2',ret:'2',retDesc:'2 bytes written',work:'writes the two bytes to the terminal',pkt:'write'},
+    open:{num:2,code:'fd = open("data", O_RDWR);',handler:'sys_open()',device:'filesystem',regs:'<b>rax</b>=2 (open)  <b>rdi</b>="data"  <b>rsi</b>=O_RDWR',ret:'3',retDesc:'file descriptor 3',work:'opens the file and allocates a descriptor',pkt:'open'},
+    read:{num:0,code:'n = read(3, buf, 80);',handler:'sys_read()',device:'disk',regs:'<b>rax</b>=0 (read)  <b>rdi</b>=3  <b>rsi</b>=buf  <b>rdx</b>=80',ret:'45',retDesc:'45 bytes read',work:'reads bytes from the file into the buffer',pkt:'read'},
+    fork:{num:57,code:'pid = fork();',handler:'sys_fork()',device:'process table',regs:'<b>rax</b>=57 (fork)',ret:'pid',retDesc:'the child PID to the parent and 0 to the child',work:'duplicates the calling process',pkt:'fork'}
+  };
+  var SC_POS={user:[146,80],disp:[112,285],handler:[386,285],device:[660,285]};
+  function scSteps(c){return [
+    {mode:'user',on:['scUser'],pkt:'user',regs:c.regs,cap:'The program reaches <code>'+c.code+'</code>. The C library places the system-call number ('+c.num+') and the arguments into CPU registers, then executes the trap instruction.'},
+    {mode:'kernel',on:['scGate','scDisp'],pkt:'disp',regs:c.regs,cap:'The trap switches the CPU from <b>user mode</b> to <b>kernel mode</b> and hands control to the system-call dispatcher.'},
+    {mode:'kernel',on:['scDisp','scHandler'],pkt:'handler',regs:c.regs,cap:'The dispatcher reads the number in <code>rax</code> ('+c.num+'), finds the matching entry in the system-call table, and calls <code>'+c.handler+'</code>.'},
+    {mode:'kernel',on:['scHandler','scDevice'],pkt:'device',regs:c.regs,cap:'<code>'+c.handler+'</code> carries out the privileged work: it '+c.work+'.'},
+    {mode:'user',on:['scUser'],pkt:'user',regs:'<b>rax</b>='+c.ret+'  (return value)',cap:'The result ('+c.retDesc+') is placed in <code>rax</code>, the CPU returns to <b>user mode</b>, and execution resumes immediately after the call.'},
+    {mode:'user',on:['scUser'],pkt:'hide',regs:'<b>rax</b>='+c.ret,cap:(c.pkt==='fork'?'Both the parent and the new child resume at this point, each receiving its own return value from the single call.':'The program continues, with the returned value now available to it.')}
+  ];}
+  var scI=0;
+  function scReset(){scI=0;scRender();el("scStepBtn").disabled=false;}
+  function scRender(){var c=SC[el("scPick").value],steps=scSteps(c),s=steps[scI];
+    el("scMode").textContent="CPU mode: "+s.mode;el("scMode").className="scmode "+s.mode;
+    el("scRegs").innerHTML=s.regs;el("scCode").textContent=c.code;
+    el("scHandlerT").textContent=c.handler;el("scDeviceT").textContent=c.device;el("scPacketT").textContent=c.pkt;
+    ["scUser","scGate","scDisp","scHandler","scDevice"].forEach(function(id){el(id).classList.toggle("on",s.on.indexOf(id)>=0);});
+    var p=el("scPacket");if(s.pkt==="hide"){p.setAttribute("opacity","0");}else{var pos=SC_POS[s.pkt];p.setAttribute("transform","translate("+pos[0]+","+pos[1]+")");p.setAttribute("opacity","1");}
+    el("scCaption").innerHTML=s.cap;
+    el("scStepBtn").textContent=(scI>=steps.length-1)?"Done · Reset to replay":"Step ›";}
+  function scStep(){var steps=scSteps(SC[el("scPick").value]);if(scI>=steps.length-1)return;scI++;scRender();if(scI>=steps.length-1)el("scStepBtn").disabled=true;}
+  var CALLS=[
+    {n:"open()",f:"file",sig:"int open(const char *path, int flags, mode_t mode);",sum:"Opens, or creates, a file and returns a file descriptor that later calls use to refer to it.",params:["<code>path</code> — the file to open","<code>flags</code> — access mode and options (O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_APPEND, …)","<code>mode</code> — permission bits, used only when the file is being created"],ret:"A non-negative file descriptor on success, or <code>-1</code> on error.",note:"The returned descriptor is the handle passed to read, write, lseek and close."},
+    {n:"read()",f:"file",sig:"ssize_t read(int fd, void *buf, size_t count);",sum:"Reads up to <code>count</code> bytes from the open file referred to by <code>fd</code> into the buffer <code>buf</code>, advancing the file offset.",params:["<code>fd</code> — a file descriptor returned by open","<code>buf</code> — the buffer that receives the data","<code>count</code> — the maximum number of bytes to read"],ret:"The number of bytes actually read, <code>0</code> at end of file, or <code>-1</code> on error.",note:""},
+    {n:"write()",f:"file",sig:"ssize_t write(int fd, const void *buf, size_t count);",sum:"Writes up to <code>count</code> bytes from <code>buf</code> to the open file referred to by <code>fd</code>, advancing the file offset.",params:["<code>fd</code> — a file descriptor","<code>buf</code> — the data to write","<code>count</code> — the number of bytes to write"],ret:"The number of bytes actually written, or <code>-1</code> on error.",note:""},
+    {n:"close()",f:"file",sig:"int close(int fd);",sum:"Closes a file descriptor so that it no longer refers to any file and can be reused.",params:["<code>fd</code> — the file descriptor to close"],ret:"<code>0</code> on success, or <code>-1</code> on error.",note:"Close descriptors you no longer need, so the process does not run out of them."},
+    {n:"fork()",f:"proc",sig:"pid_t fork(void);",sum:"Creates a new process, the child, as a near-exact copy of the calling process, the parent. Execution then continues in both from the point of the call.",params:["takes no arguments"],ret:"Returns <span class='ret zero'>0</span> in the child, the child's PID (<span class='ret pos'>&gt; 0</span>) in the parent, or <span class='ret neg'>-1</span> on failure.",note:"fork() returns twice: once in the parent and once in the child."},
+    {n:"wait()",f:"proc",sig:"pid_t wait(int *status);",sum:"Suspends the calling process until one of its child processes terminates, then retrieves that child's exit status.",params:["<code>status</code> — receives the child's exit information; may be NULL if it is not needed"],ret:"The PID of the child that terminated, or <code>-1</code> if the process has no children.",note:"Collecting the status removes the child's zombie entry from the process table."},
+    {n:"exec()",f:"proc",sig:"int execl(const char *path, const char *arg0, ..., NULL);",sum:"Replaces the current process image with a new program loaded from <code>path</code>. The process keeps its PID but runs entirely new code.",params:["<code>path</code> — the absolute path to the executable","<code>arg0, …</code> — the argument list, ending with a NULL pointer"],ret:"Does not return on success. Returns <code>-1</code> only if the new program could not be started.",note:"Usually called in the child after fork() to run a different program."}
+  ];
+  function buildCallExplorer(){var b=el("callExplorer");b.innerHTML="";CALLS.forEach(function(c){var x=document.createElement("button");x.className="pickbtn";x.innerHTML=c.n+"<small>"+(c.f==="file"?"file op":"process op")+"</small>";x.onclick=function(){b.querySelectorAll(".pickbtn").forEach(function(y){y.classList.remove("on");});x.classList.add("on");scShowCall(c);};b.appendChild(x);});}
+  function scShowCall(c){var h='<div class="docsig">'+c.sig+'</div><div class="docmeta">'+(c.f==="file"?"File operation":"Process operation")+'</div><p style="margin:7px 0 0">'+c.sum+'</p>';
+    h+='<div class="docrow"><span class="dk">Parameters</span><ul class="doclist">'+c.params.map(function(p){return "<li>"+p+"</li>";}).join("")+'</ul></div>';
+    h+='<div class="docrow"><span class="dk">Returns</span><span class="dv">'+c.ret+'</span></div>';
+    if(c.note)h+='<div class="docnote">'+c.note+'</div>';
+    el("callExplain").innerHTML=h;}
+  var UK=[{t:"Add two numbers",k:0},{t:"Print to the screen",k:1,c:"write()"},{t:"Open a file",k:1,c:"open()"},{t:"Loop 1000 times",k:0},{t:"Create a process",k:1,c:"fork()"},{t:"Compute a factorial",k:0},{t:"Read keyboard input",k:1,c:"read()"},{t:"Replace the program",k:1,c:"exec()"}];
+  function ukReset(){var b=el("ukList");b.innerHTML="";UK.forEach(function(u){var x=document.createElement("button");x.className="pickbtn";x.style.minHeight="58px";x.textContent=u.t;x.onclick=function(){if(x.dataset.d)return;x.dataset.d="1";if(u.k){x.classList.add("on");x.innerHTML=u.t+"<small>kernel · "+u.c+"</small>";}else{x.style.background="var(--greend)";x.style.borderColor="var(--greenl)";x.style.color="var(--green)";x.innerHTML=u.t+"<small>user space · no syscall</small>";}};b.appendChild(x);});el("ukNote").innerHTML="Click each operation to reveal whether your program does it directly, or must ask the kernel.";}
+  var STRACE={hello:["execve(\"./hello\", [\"./hello\"], ...) = 0","write(1, \"Hello, World!\\n\", 14) = 14","exit_group(0) = ?"],
+    filewrite:["execve(\"./writer\", ...) = 0","openat(AT_FDCWD, \"testfile\", O_WRONLY|O_CREAT, 0600) = 3","write(3, \"The quick brown fox...\\n\", 45) = 45","close(3) = 0","exit_group(0) = ?"],
+    fork:["execve(\"./forker\", ...) = 0","fork() = 12473","write(1, \"parent\\n\", 7) = 7","wait4(12473, ...) = 12473","exit_group(0) = ?"]};
+  var STRACE_L={hello:"./hello",filewrite:"./writer (file)",fork:"./forker (fork+wait)"};
+  function buildStrace(){var r=el("straceProg");r.innerHTML="";Object.keys(STRACE).forEach(function(k,i){var b=document.createElement("button");b.className="opt2"+(i===0?" on":"");b.textContent=STRACE_L[k];b.onclick=function(){r.querySelectorAll(".opt2").forEach(function(y){y.classList.remove("on");});b.classList.add("on");straceShow(k);};r.appendChild(b);});straceShow("hello");}
+  function straceShow(k){var o=el("straceOut");o.innerHTML='<div class="dim">$ strace '+(k==="hello"?"./hello":k==="filewrite"?"./writer":"./forker")+'</div>';var t=200;STRACE[k].forEach(function(ln){setTimeout(function(){var d=document.createElement("div");var parts=ln.split(" = ");d.innerHTML='<span class="gn">'+esc(parts[0])+'</span> = <span class="pid">'+esc(parts[1])+'</span>';o.appendChild(d);o.scrollTop=o.scrollHeight;},t);t+=260;});}
+
+  /* ===== S4: file lab + fd table + permissions ===== */
+  var FL_FLAGS=["O_RDONLY","O_WRONLY","O_RDWR","O_APPEND","O_TRUNC","O_CREAT","O_EXCL"];
+  var FL;
+  function flReset(){FL={open:false,fd:null,bytes:[],offset:0,flags:{O_WRONLY:true,O_CREAT:true},gen:[]};buildFlFlags();el("flMode").value="0600";el("flFdVal").textContent="—";el("flStr").value="Hello, world";el("flN").value="0";el("flReadN").value="5";el("flWhence").value="SET";flStat("—");flRender([]);el("flLog").innerHTML='<div class="dim">// open the file to begin</div>';flGen();fdTable();}
+  function buildFlFlags(){var b=el("flFlags");b.innerHTML="";FL_FLAGS.forEach(function(f){var x=document.createElement("button");x.className="opt2"+(FL.flags[f]?" on":"");x.textContent=f;x.onclick=function(){if(FL.open)return;FL.flags[f]=!FL.flags[f];x.classList.toggle("on");};b.appendChild(x);});}
+  function flStat(r){el("flOff").textContent=FL.offset;el("flSize").textContent=FL.bytes.length;el("flRet").textContent=r;}
+  function flLog(cls,t){var l=el("flLog");if(l.querySelector(".dim"))l.innerHTML="";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=t;l.appendChild(d);l.scrollTop=l.scrollHeight;}
+  function flGen(){var g=el("flGenC");g.innerHTML=FL.gen.length?FL.gen.map(esc).join("\n"):'<span class="c-com">// generated C appears here</span>';}
+  function flActive(){return FL_FLAGS.filter(function(f){return FL.flags[f];}).join(" | ")||"0";}
+  function fdTable(){var rows="<tr><th>fd</th><th>points to</th></tr><tr><td>0</td><td>stdin (keyboard)</td></tr><tr><td>1</td><td>stdout (screen)</td></tr><tr><td>2</td><td>stderr</td></tr>";if(FL.open)rows+='<tr><td style="color:var(--ac2)">3</td><td style="color:var(--ac2)">testfile</td></tr>';el("fdTable").innerHTML=rows;}
+  function flRender(just,readIdx){var st=el("flStrip");st.innerHTML="";var len=Math.max(FL.bytes.length,FL.offset,12);for(var i=0;i<len;i++){var cell=document.createElement("div");cell.className="cell";var ch=FL.bytes[i];if(ch!=null){cell.classList.add("filled");cell.textContent=(ch==="\n")?"↵":(ch===" ")?"·":ch;}else cell.textContent="";if(just&&just.indexOf(i)>=0)cell.classList.add("just");if(readIdx&&readIdx.indexOf(i)>=0)cell.classList.add("readhi");if(i%5===0){var x=document.createElement("span");x.className="idx";x.textContent=i;cell.appendChild(x);}st.appendChild(cell);}var mk=document.createElement("div");mk.className="offmark";mk.style.left=(FL.offset*28+4)+"px";var ol=document.createElement("span");ol.className="ol";ol.textContent="offset "+FL.offset;mk.appendChild(ol);st.appendChild(mk);}
+  function flOpen(){if(FL.open){flLog("dim","already open — close first");return;}FL.open=true;FL.fd=3;FL.bytes=[];FL.offset=0;el("flFdVal").textContent="3";flStat(3);FL.gen=['int fd = open("testfile", '+flActive()+(FL.flags.O_CREAT?(", "+el("flMode").value):"")+");"];flGen();flRender([]);fdTable();flLog("ok",'open("testfile", '+flActive()+") → fd = 3");}
+  function flGuard(){if(!FL.open){flLog("mv","error: file not open — press open() first");return false;}return true;}
+  function flWrite(str){if(!flGuard())return;if(FL.flags.O_RDONLY){flLog("mv","write → -1 (opened O_RDONLY)");flStat(-1);return;}var s=(typeof str==="string")?str:el("flStr").value;var disp=s.replace(/\n/g,"\\n");if(FL.flags.O_APPEND)FL.offset=FL.bytes.length;var just=[];for(var i=0;i<s.length;i++){FL.bytes[FL.offset]=s[i];just.push(FL.offset);FL.offset++;}FL.gen.push('write(fd, "'+disp+'", '+s.length+");");flGen();flRender(just);flStat(s.length);flLog("ok",'write(fd, "'+disp+'", '+s.length+") → "+s.length+" bytes, offset "+FL.offset);}
+  function flSeek(){if(!flGuard())return;var n=parseInt(el("flN").value,10)||0,w=el("flWhence").value,base=w==="SET"?0:w==="CUR"?FL.offset:FL.bytes.length,no=base+n;if(no<0)no=0;FL.offset=no;FL.gen.push("lseek(fd, "+n+", SEEK_"+w+");");flGen();flRender([]);flStat(no);flLog("mv","lseek(fd, "+n+", SEEK_"+w+") → offset = "+no);}
+  function flRead(){if(!flGuard())return;if(FL.flags.O_WRONLY){flLog("mv","read → -1 (opened O_WRONLY)");flStat(-1);return;}var n=parseInt(el("flReadN").value,10)||0,idx=[],got=0;for(var i=0;i<n;i++){if(FL.bytes[FL.offset]!=null){idx.push(FL.offset);got++;}FL.offset++;}FL.gen.push("read(fd, buf, "+n+");");flGen();flRender([],idx);flStat(got);flLog("","read(fd, buf, "+n+") → "+got+" bytes, offset "+FL.offset);}
+  function flClose(){if(!flGuard())return;FL.open=false;FL.fd=null;el("flFdVal").textContent="—";FL.gen.push("close(fd);");flGen();fdTable();flLog("","close(fd) → closed (size "+FL.bytes.length+")");}
+  function flPreset(w){flReset();if(w==="together"){FL.flags={O_RDWR:true};buildFlFlags();flPlay([function(){flOpen();},function(){el("flStr").value="Hello, world";flWrite("Hello, world");},function(){el("flN").value="0";el("flWhence").value="SET";flSeek();},function(){el("flReadN").value="12";flRead();},function(){flClose();}]);}
+    else if(w==="ex2"){FL.flags={O_WRONLY:true,O_CREAT:true};buildFlFlags();var s="The quick brown fox jumps over the lazy dog.\n";flPlay([function(){flOpen();},function(){el("flStr").value=s;flWrite(s);},function(){flClose();}]);}
+    else if(w==="ex3"){FL.flags={O_WRONLY:true,O_CREAT:true};buildFlFlags();var t="The quick brown fox jumps over the lazy dog.\n";flPlay([function(){flOpen();},function(){el("flStr").value=t;flWrite(t);flLog("ok","1st write → 45 bytes (0..44)");},function(){el("flN").value="5";el("flWhence").value="SET";flSeek();},function(){el("flStr").value=t;flWrite(t);flLog("ok","2nd write → overwrites 5..44, extends to 49");},function(){flClose();flLog("mv","► final size = "+FL.bytes.length+" bytes (not 90)");}]);}}
+  function flPlay(steps){var t=300;steps.forEach(function(fn){setTimeout(fn,t);t+=1050;});}
+  var PERM;
+  function permReset(){PERM={owner:{r:1,w:1,x:0},group:{r:0,w:0,x:0},other:{r:0,w:0,x:0}};permRender();}
+  function permRender(){var g=el("permGrid");g.innerHTML="";var hdr=["","r","w","x"];hdr.forEach(function(h){var d=document.createElement("div");d.className="pl";d.style.textAlign="center";d.textContent=h;g.appendChild(d);});
+    ["owner","group","other"].forEach(function(who){var lbl=document.createElement("div");lbl.className="pl";lbl.textContent=who;g.appendChild(lbl);["r","w","x"].forEach(function(bit){var c=document.createElement("div");c.className="permcell"+(PERM[who][bit]?" on":"");c.textContent=PERM[who][bit]?bit:"–";c.onclick=function(){PERM[who][bit]=PERM[who][bit]?0:1;permRender();};g.appendChild(c);});});
+    var oct="",sym="";["owner","group","other"].forEach(function(who){var v=(PERM[who].r?4:0)+(PERM[who].w?2:0)+(PERM[who].x?1:0);oct+=v;sym+=(PERM[who].r?"r":"-")+(PERM[who].w?"w":"-")+(PERM[who].x?"x":"-");});el("permOct").textContent="0"+oct;el("permStr").textContent=sym;}
+
+  /* ===== S5: process sandbox ===== */
+  var PE,peSel,pePid;
+  function peReset(){PE=new PTree();pePid=1000;var r=PE.add(null,{label:"main",sub:"pid 1000",pid:1000,status:"run"});peSel=r;peDraw();peWho2();el("peConsole").innerHTML='<span class="dim">main started (pid 1000). Click a process, then act.</span>';peTable();el("peNote").innerHTML="Try: <b>fork</b> main, select the child, <b>exit</b> it → it becomes a <span style='color:var(--red)'>zombie</span>. Select the parent and <b>wait()</b> to reap it.";}
+  function peScls(s){return s==="zombie"?"st-zombie":s==="wait"?"st-wait":s==="exec"?"st-exec":"st-run";}
+  function peDraw(){Object.keys(PE.nodes).forEach(function(id){var nd=PE.nodes[id];nd.cls=(id===PE.root&&nd.status==="run")?"st-root":peScls(nd.status);nd.sel=(id===peSel);});PE.render(el("peSvg"),{clickable:true,onclick:peSelect});}
+  function peSelect(id){peSel=id;peDraw();peWho2();}
+  function peWho2(){var nd=PE.nodes[peSel];el("peWho").textContent="selected: "+nd.label+" (pid "+nd.pid+", "+nd.status+")";}
+  function peLog(cls,t){var c=el("peConsole");if(c.querySelector(".dim"))c.innerHTML="";var d=document.createElement("div");if(cls)d.className=cls;d.innerHTML=t;c.appendChild(d);c.scrollTop=c.scrollHeight;}
+  function peTable(){var rows="<tr><th>pid</th><th>ppid</th><th>cmd</th><th>state</th></tr>";Object.keys(PE.nodes).forEach(function(id){var nd=PE.nodes[id];var pp=nd.parent!=null?PE.nodes[nd.parent].pid:0;var st=nd.status==="wait"?'<span class="badge wait">waiting</span>':nd.status==="zombie"?'<span class="badge zombie">zombie</span>':nd.status==="exec"?'<span class="badge exec">'+nd.label+'</span>':'<span class="badge run">running</span>';rows+="<tr><td>"+nd.pid+"</td><td>"+pp+"</td><td>"+nd.label+"</td><td>"+st+"</td></tr>";});el("peTable").innerHTML=rows;}
+  function peDo(action){var nd=PE.nodes[peSel];if(!nd)return;if(nd.status==="zombie"){peLog("dim","pid "+nd.pid+" is a zombie — select its parent and wait().");return;}
+    if(action==="fork"){if(nd.status==="exec"){peLog("dim","pid "+nd.pid+" has exec'd into "+nd.label+" — fork an original process instead.");return;}var cp=++pePid;var cid=PE.add(peSel,{label:"child",sub:"pid "+cp,pid:cp,status:"run"});PE.nodes[cid]._new=true;peLog("","<span class='pid'>pid "+nd.pid+"</span> fork() → returned <b>"+cp+"</b> to parent, <b>0</b> to new child (pid "+cp+")");peDraw();peWho2();peTable();return;}
+    if(action==="exec"){nd.status="exec";nd.label="/bin/ls";nd.sub="pid "+nd.pid;peLog("","<span class='pid'>pid "+nd.pid+"</span> execl(\"/bin/ls\", ...) → image replaced; <span class='dim'>no return on success</span>");peDraw();peWho2();peTable();return;}
+    if(action==="exit"){if(peSel===PE.root){peLog("dim","main is the last to exit — exit a child instead.");return;}var par=PE.nodes[nd.parent];if(par.status==="wait"){var pid0=nd.pid;peReap(peSel);par.status="run";peLog("","<span class='pid'>pid "+pid0+"</span> exit() → parent (pid "+par.pid+") was waiting, so it is <b>reaped</b> immediately");peSel=nd.parent;}else{nd.status="zombie";nd.label="(zombie)";peLog("mv","<span class='pid'>pid "+nd.pid+"</span> exit() → became a <b>zombie</b> (parent hasn't wait()ed)");}peDraw();peWho2();peTable();return;}
+    if(action==="wait"){var zomb=nd.children.filter(function(cid){return PE.nodes[cid].status==="zombie";});var run=nd.children.filter(function(cid){return PE.nodes[cid].status!=="zombie";});if(zomb.length){var z=PE.nodes[zomb[0]].pid;peReap(zomb[0]);peLog("","<span class='pid'>pid "+nd.pid+"</span> wait() → reaped zombie child <b>"+z+"</b>");}else if(run.length){nd.status="wait";peLog("mv","<span class='pid'>pid "+nd.pid+"</span> wait() → <b>blocked</b>, waiting for a child to exit");}else{peLog("dim","<span class='pid'>pid "+nd.pid+"</span> wait() → no children (returns -1)");}peDraw();peWho2();peTable();return;}}
+  function peReap(id){var nd=PE.nodes[id],par=PE.nodes[nd.parent],ix=par.children.indexOf(id);if(ix>=0)par.children.splice(ix,1);nd.children.forEach(function(cid){PE.nodes[cid].parent=nd.parent;par.children.push(cid);});delete PE.nodes[id];if(peSel===id)peSel=nd.parent;}
+  /* fork-role */
+  function frRole(role){el("frParent").className="btn sm"+(role==="parent"?"":" ghost");el("frChild").className="btn sm"+(role==="child"?"":" ghost");
+    var code=role==="child"?'pid_t pid = fork();\nif (pid == 0)\n>>> printf("I\'m the child\\n");\nelse if (pid > 0)\n    printf("I\'m the parent, child = %d\\n", pid);':'pid_t pid = fork();\nif (pid == 0)\n    printf("I\'m the child\\n");\nelse if (pid > 0)\n>>> printf("I\'m the parent, child = %d\\n", pid);';
+    el("frCode").innerHTML=hlC(code).replace(/&gt;&gt;&gt;/g,'<span style="color:#6ee7a8;font-weight:700">▶</span>');
+    el("frOut").innerHTML=role==="child"?'<span class="et">As the CHILD,</span> <code>fork()</code> returned <span class="ret zero">0</span>, so the <code>pid == 0</code> branch runs → prints <code>I\'m the child</code>.':'<span class="et">As the PARENT,</span> <code>fork()</code> returned the child\'s PID (<span class="ret pos">&gt; 0</span>), so the <code>else if</code> branch runs → prints <code>I\'m the parent, child = …</code>.';}
+  /* fork program simulator */
+  var FPS,FPS_PRESETS={"3 forks":"fork();\nfork();\nfork();","fork + print":"fork();\nprintf(\"hi\\n\");","print, fork, print":"printf(\"A\\n\");\nfork();\nprintf(\"B\\n\");","2 forks + print":"fork();\nfork();\nprintf(\"X\\n\");"};
+  function fpsParse(src){return src.split("\n").map(function(l){return l.trim();}).filter(function(l){return l&&l.indexOf("//")!==0;}).map(function(l){if(/^fork\s*\(/.test(l))return{raw:l,type:"fork"};var m=l.match(/printf\s*\(\s*"((?:[^"\\]|\\.)*)"/);if(m)return{raw:l,type:"print",arg:m[1]};if(/^(int |return|\{|\})/.test(l))return{raw:l,type:"nop",skip:1};return{raw:l,type:"nop"};});}
+  function fpsReset(){FPS={stmts:fpsParse(el("fpsCode").value),idx:-1,tree:new PTree(),prints:0};var r=FPS.tree.add(null,{label:"P0",sub:"main"});FPS.live=[r];fpsTree();fpsLines();el("fpsProc").textContent=1;el("fpsPrints").textContent=0;el("fpsOut").innerHTML='<span class="dim">// output appears as you step</span>';var real=FPS.stmts.filter(function(s){return s.type!=="nop";}).length;el("fpsStepBtn").disabled=(real===0);el("fpsStepBtn").textContent="Step ›";el("fpsNote").innerHTML="Press <b>Step</b> to run one line in <b>every</b> live process. Each <code>fork()</code> doubles them; each <code>printf()</code> prints once per live process.";}
+  function fpsLines(){el("fpsLines").innerHTML=FPS.stmts.map(function(s,i){var cur=(i===FPS.idx),done=(i<FPS.idx);var st=cur?'style="color:var(--ac2);font-weight:700"':done?'style="color:var(--tx3)"':(s.skip?'style="color:#3a4252"':'');return '<div '+st+'>'+(cur?'▶ ':'&nbsp;&nbsp;')+esc(s.raw)+'</div>';}).join("")||'<div class="dim">// no statements</div>';}
+  function fpsTree(){FPS.tree.render(el("fpsSvg"),{nodeW:58,colW:66,rowH:76});}
+  function fpsO(cls,t){var o=el("fpsOut");if(o.querySelector(".dim"))o.innerHTML="";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=t;o.appendChild(d);o.scrollTop=o.scrollHeight;}
+  function fpsStep(){if(!FPS||FPS.idx>=FPS.stmts.length-1)return;FPS.idx++;var s=FPS.stmts[FPS.idx];
+    if(s.type==="fork"){var nl=[];FPS.live.forEach(function(pid){var c=FPS.tree.add(pid,{label:"proc",sub:"fork"});FPS.tree.nodes[c]._new=true;nl.push(c);});FPS.live=FPS.live.concat(nl);fpsTree();el("fpsProc").textContent=FPS.live.length;fpsO("","fork()  →  now "+FPS.live.length+" live processes");el("fpsNote").innerHTML="<code>fork()</code> ran in every process → the population <b>doubled</b> to <b>"+FPS.live.length+"</b>.";}
+    else if(s.type==="print"){var n=FPS.live.length;FPS.prints+=n;el("fpsPrints").textContent=FPS.prints;var txt=unesc(s.arg).replace(/\n/g,"");fpsO("gn",'printf("'+s.arg+'")  →  "'+txt+'" printed ×'+n);el("fpsNote").innerHTML="<code>printf</code> ran in all <b>"+n+"</b> live processes → <b>"+txt+"</b> printed <b>"+n+"</b> time"+(n>1?"s":"")+".";}
+    else fpsO("dim","(line ignored: "+s.raw+")");
+    fpsLines();if(FPS.idx>=FPS.stmts.length-1){el("fpsStepBtn").disabled=true;el("fpsStepBtn").textContent="Done — Reset";el("fpsNote").innerHTML="Finished: <b>"+FPS.live.length+"</b> processes created, <b>"+FPS.prints+"</b> total lines printed.";}else el("fpsStepBtn").textContent="Step ›";}
+  function fpsRunAll(){fpsReset();var g=function(){if(FPS.idx<FPS.stmts.length-1){fpsStep();setTimeout(g,720);}};setTimeout(g,150);}
+  function buildFpsPresets(){var r=el("fpsPresets");r.innerHTML="";Object.keys(FPS_PRESETS).forEach(function(k,i){var b=document.createElement("button");b.className="opt2"+(i===0?" on":"");b.textContent=k;b.onclick=function(){r.querySelectorAll(".opt2").forEach(function(y){y.classList.remove("on");});b.classList.add("on");el("fpsCode").value=FPS_PRESETS[k];fpsReset();};r.appendChild(b);});el("fpsCode").value=FPS_PRESETS["3 forks"];}
+  /* memory after fork */
+  var MEM;
+  function memReset(){MEM={forked:false,px:5,cx:5};memRender();el("memForkBtn").disabled=false;el("memNote").innerHTML="One process, one variable. Press <code>fork()</code> to copy the address space — then change <code>x</code> in each and watch them stay independent.";}
+  function memRender(){var b=el("memBoxes");if(!MEM.forked)b.innerHTML='<div class="membox parent"><span class="ml">process · pid 1000</span><span class="memx">int x = '+MEM.px+'</span></div>';else b.innerHTML='<div class="membox parent"><span class="ml">parent · pid 1000</span><span class="memx">x = '+MEM.px+'</span></div><div class="memarrow">≠</div><div class="membox child"><span class="ml">child · pid 1001</span><span class="memx">x = '+MEM.cx+'</span></div>';}
+  function memFork(){if(MEM.forked)return;MEM.forked=true;MEM.cx=MEM.px;memRender();el("memForkBtn").disabled=true;el("memNote").innerHTML="<code>fork()</code> <b>copied</b> the address space — parent and child each have their <b>own</b> <code>x</code> (both "+MEM.px+" for now).";}
+  function memParent(){if(!MEM.forked){MEM.px++;memRender();el("memNote").innerHTML="Still one process — <code>fork()</code> to split it.";return;}MEM.px++;memRender();el("memNote").innerHTML="Parent changed <b>its</b> x to <b>"+MEM.px+"</b> → the child's x is <b>unaffected</b> ("+MEM.cx+"). Separate memory.";}
+  function memChild(){if(!MEM.forked){el("memNote").innerHTML="<code>fork()</code> first to create a child.";return;}MEM.cx=99;memRender();el("memNote").innerHTML="Child set <b>its</b> x to <b>99</b> → the parent's x is <b>unaffected</b> ("+MEM.px+"). Separate memory.";}
+  /* race */
+  var rcWait=false;
+  function rcToggleWait(){rcWait=!rcWait;var b=el("rcWaitBtn");b.textContent="wait(): "+(rcWait?"on":"off");b.className="btn"+(rcWait?"":" ghost");}
+  function shuffleMerge(A,B){var r=[],i=0,j=0;while(i<A.length||j<B.length){if(i>=A.length)r.push(B[j++]);else if(j>=B.length)r.push(A[i++]);else if(Math.random()<0.5)r.push(A[i++]);else r.push(B[j++]);}return r;}
+  function rcRun(){var o=el("rcOut");o.innerHTML="";var lines;if(rcWait)lines=["[parent] forked a child, now waiting","[child]  hello from child","[child]  child exiting","[parent] child done — continuing"];else lines=shuffleMerge(["[parent] forked a child","[parent] hello from parent"],["[child]  hello from child","[child]  child exiting"]);var t=100;lines.forEach(function(l){setTimeout(function(){var d=document.createElement("div");d.className=l.indexOf("child")>=0?"gn":"pid";d.textContent=l;o.appendChild(d);o.scrollTop=o.scrollHeight;},t);t+=320;});}
+  /* state machine */
+  var PS_BOX=["New","Ready","Running","Waiting","Zombie","Reaped"],PS_SEQ=[0,1,2,3,2,4,5],PS_CAP=["A process is created — e.g. by <code>fork()</code>.","In the <b>ready queue</b>, waiting for CPU time.","Scheduled onto the CPU — <b>executing</b> instructions.","<b>Blocked</b> on I/O, or on <code>wait()</code> for a child.","Unblocked — back to <b>running</b>.","Called <code>exit()</code>: <b>terminated</b>, but its exit status isn't collected yet — a <span style='color:var(--red)'>zombie</span>.","Parent called <code>wait()</code>: status collected, process <b>removed</b>."],psI=0;
+  function psReset(){psI=0;var sv=el("psSvg");sv.setAttribute("viewBox","0 0 760 150");sv.innerHTML="";var xs=[14,140,266,392,520,646],W=108;for(var i=0;i<6;i++){if(i<5){sv.appendChild(svg("path",{class:"edge",d:"M"+(xs[i]+W)+",75 L"+xs[i+1]+",75","marker-end":""}));sv.appendChild(svg("path",{class:"edge",d:"M"+(xs[i+1]-7)+",70 L"+xs[i+1]+",75 L"+(xs[i+1]-7)+",80"}));}var g=svg("g",{id:"psb"+i,class:"pn node-int"});g.appendChild(svg("rect",{class:"node-box",x:xs[i],y:52,width:W,height:46,rx:9}));var tx=svg("text",{x:xs[i]+W/2,y:79,"text-anchor":"middle",class:"nlabel","font-size":13});tx.textContent=PS_BOX[i];g.appendChild(tx);sv.appendChild(g);}psHi();el("psStepBtn").disabled=false;el("psStepBtn").textContent="Next ›";}
+  function psHi(){for(var i=0;i<6;i++){var g=el("psb"+i);g.setAttribute("class","pn node-int");}var b=PS_SEQ[psI];var cls=b===4?"st-zombie":b===5?"node-leaf":"st-run";el("psb"+b).setAttribute("class","pn "+cls);el("psCap").innerHTML="<b>"+PS_BOX[b]+":</b> "+PS_CAP[psI];}
+  function psStep(){if(psI>=PS_SEQ.length-1){return;}psI++;psHi();if(psI>=PS_SEQ.length-1){el("psStepBtn").textContent="Done — Reset";el("psStepBtn").disabled=true;}else el("psStepBtn").textContent="Next ›";}
+  /* exec family */
+  var EXECF=[{n:"execl",d:"<b>l</b> = argument <b>list</b>. Pass each argument separately, ending with NULL. Needs the full path: <code>execl(\"/bin/ls\", \"ls\", NULL)</code>."},{n:"execv",d:"<b>v</b> = argument <b>vector</b>. Pass a NULL-terminated <code>char *argv[]</code> array: <code>execv(\"/bin/ls\", argv)</code>. Easier for a variable number of args."},{n:"execlp",d:"list + <b>p</b> = searches <code>PATH</code>, so just <code>\"ls\"</code> works: <code>execlp(\"ls\", \"ls\", NULL)</code>."},{n:"execvp",d:"vector + <b>p</b> = an args array <em>and</em> PATH search: <code>execvp(\"ls\", argv)</code> — the most convenient."}];
+  function buildExecExplorer(){var b=el("execList");b.innerHTML="";EXECF.forEach(function(c){var x=document.createElement("button");x.className="pickbtn";x.textContent=c.n;x.onclick=function(){b.querySelectorAll(".pickbtn").forEach(function(y){y.classList.remove("on");});x.classList.add("on");el("execExplain").innerHTML='<span class="et">'+c.n+'()</span><br>'+c.d;};b.appendChild(x);});}
+  /* orphan vs zombie */
+  var ORP,orpI;
+  function orpReset(){ORP=new PTree();var init=ORP.add(null,{label:"init",sub:"pid 1",cls:"st-root"});var par=ORP.add(init,{label:"parent",sub:"pid 1000",cls:"st-run"});var ch=ORP.add(par,{label:"child",sub:"pid 1001",cls:"st-run"});ORP._init=init;ORP._par=par;ORP._ch=ch;orpI=0;orpDraw();el("orpCap").innerHTML="<b>Setup:</b> init (pid 1) is the ancestor of every process. Here, parent 1000 has forked child 1001.";el("orpBtn").disabled=false;el("orpBtn").textContent="Next ›";}
+  function orpDraw(){ORP.render(el("orpSvg"),{nodeW:90,colW:106,rowH:94});}
+  var ORP_STEPS=[function(){ORP.nodes[ORP._par].cls="st-zombie";ORP.nodes[ORP._par].label="parent exits";orpDraw();el("orpCap").innerHTML="<b>1.</b> The parent calls <code>exit()</code> <em>before</em> the child finishes.";},
+    function(){var ch=ORP._ch,par=ORP._par,init=ORP._init,ix=ORP.nodes[par].children.indexOf(ch);if(ix>=0)ORP.nodes[par].children.splice(ix,1);ORP.nodes[ch].parent=init;ORP.nodes[init].children.push(ch);ORP.nodes[ch]._new=true;ORP.nodes[ch].cls="st-exec";orpDraw();el("orpCap").innerHTML="<b>2.</b> The child is now an <b style='color:var(--cyan)'>orphan</b> → the OS automatically <b>reparents it to init (pid 1)</b>.";},
+    function(){var par=ORP._par,init=ORP._init,ix=ORP.nodes[init].children.indexOf(par);if(ix>=0)ORP.nodes[init].children.splice(ix,1);delete ORP.nodes[par];ORP.nodes[ORP._ch].cls="st-run";orpDraw();el("orpCap").innerHTML="<b>3.</b> init <b>reaps</b> the exited parent and will <code>wait()</code> for the orphan too — so an orphan is <b>never</b> a permanent zombie. A <span style='color:var(--red)'>zombie</span>, by contrast, is a child whose <em>living</em> parent simply hasn't <code>wait()</code>ed yet.";}];
+  function orpStep(){if(orpI>=ORP_STEPS.length)return;ORP_STEPS[orpI]();orpI++;if(orpI>=ORP_STEPS.length){el("orpBtn").disabled=true;el("orpBtn").textContent="Done — Reset";}else el("orpBtn").textContent="Next ›";}
+
+  /* ===== S7: Example 1 stepper ===== */
+  var ex1,ex1i,ex1forkers,ex1pid;
+  function ex1Reset(){ex1=new PTree();ex1pid=2000;ex1.add(null,{label:"P0",sub:"original",pid:2000});ex1i=0;ex1forkers=[ex1.root];ex1Draw();ex1Stat();el("ex1Console").innerHTML='<span class="dim">// output appears as you step</span>';el("ex1StepBtn").disabled=false;el("ex1StepBtn").textContent="Run i = 1 ›";el("ex1Note").innerHTML="Start: just <b>P0</b>. Each iteration, <b>every</b> process forks once — so the count doubles.";}
+  function ex1Stat(){el("ex1Proc").textContent=Object.keys(ex1.nodes).length;el("ex1I").textContent=ex1i;el("ex1Echo").textContent=Object.keys(ex1.nodes).filter(function(id){return ex1.nodes[id].leaf;}).length;}
+  function ex1Draw(){ex1.render(el("ex1Svg"),{nodeW:74,colW:86});}
+  function ex1Out(cls,t){var c=el("ex1Console");if(c.querySelector(".dim"))c.innerHTML="";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=t;c.appendChild(d);c.scrollTop=c.scrollHeight;}
+  function ex1Step(){if(ex1i>=3)return;ex1i++;var snap=ex1forkers.slice(),kids=[];snap.forEach(function(pid){var echo=(ex1i===3),pp=ex1.nodes[pid].pid,cp=++ex1pid,cid=ex1.add(pid,echo?{label:"echo ★",sub:"pid "+cp,pid:cp,leaf:true,pulse:true}:{label:"child",sub:"i = "+ex1i,pid:cp});ex1.nodes[cid]._new=true;ex1Out("","Parent process "+pp+" forked child process "+cp);if(!echo)kids.push(cid);});if(ex1i===3)for(var e=0;e<4;e++)ex1Out("gn","Hello World");if(ex1i<3)ex1forkers=ex1forkers.concat(kids);ex1Draw();ex1Stat();var c=Object.keys(ex1.nodes).length,b=el("ex1StepBtn");if(ex1i>=3){b.disabled=true;b.textContent="Loop finished (i > 3)";el("ex1Note").innerHTML="<b>i = 3:</b> the 4 newest children reach <code>FORK_DEPTH</code> and <code>execl(\"/bin/echo\")</code> → <b>\"Hello World\" prints 4 times</b>, across <b>8</b> processes.";}else{b.textContent="Run i = "+(ex1i+1)+" ›";el("ex1Note").innerHTML="<b>i = "+ex1i+":</b> every process forked once → <b>"+c+"</b> processes now. Keep stepping…";}}
+  function ex1RunAll(){if(!ex1||ex1i>=3)ex1Reset();var g=function(){if(ex1i<3){ex1Step();setTimeout(g,820);}};setTimeout(g,160);}
+  /* ex4 chdir+exec */
+  var EX4=[["/home/student","chdir(\"..\") → process current directory is now /home/student","mv"],["/home/student","execl(\"/bin/ls\", \"/bin/ls\", NULL) → this process becomes ls","ac"],["/home/student","ls output:  oslab   documents   projects","gn"],["/home/student","(\"Double eek!\" never prints — execl succeeded, so nothing after it runs)","dim"]],ex4i;
+  function ex4Reset(){ex4i=0;el("ex4Cwd").textContent="/home/student/oslab";el("ex4Out").innerHTML='<span class="dim">// press Step</span>';el("ex4Btn").disabled=false;el("ex4Btn").textContent="Step ›";el("ex4Note").innerHTML="Step through to see <code>chdir</code> change <em>this process's</em> directory, then <code>execl</code> replace it with <code>ls</code>.";}
+  function ex4Step(){if(ex4i>=EX4.length)return;var s=EX4[ex4i];el("ex4Cwd").textContent=s[0];var o=el("ex4Out");if(o.querySelector(".dim"))o.innerHTML="";var d=document.createElement("div");d.className=s[2];d.textContent=s[1];o.appendChild(d);o.scrollTop=o.scrollHeight;ex4i++;if(ex4i>=EX4.length){el("ex4Btn").disabled=true;el("ex4Btn").textContent="Done";}}
+  /* Task 2 ordering */
+  var T2=[["parent: pid = fork() → child created","pid"],["child: pid = fork() → grandchild created","pid"],["parent calls wait() and blocks; child calls wait() and blocks","dim"],["grandchild prints  →  I am grandchild","gn"],["child wakes from wait(), prints  →  I am child","gn"],["parent wakes from wait(), prints  →  I am parent","gn"]],t2i;
+  function t2Reset(){t2i=0;el("t2Out").innerHTML='<span class="dim">// press Next step</span>';el("t2Note").innerHTML="Step through: the deepest process prints first because each ancestor <code>wait()</code>s for its descendant before printing.";}
+  function t2Step(){if(t2i>=T2.length){t2Reset();return;}var s=T2[t2i],o=el("t2Out");if(o.querySelector(".dim"))o.innerHTML="";var d=document.createElement("div");d.className=s[1];d.textContent=s[0];o.appendChild(d);o.scrollTop=o.scrollHeight;t2i++;if(t2i>=T2.length)el("t2Note").innerHTML="Output order is <b>grandchild → child → parent</b> — exactly as required. Press Next to replay.";}
+  /* Task 5 builder */
+  var t5,t5c;
+  function t5Reset(){t5=new PTree();t5.add(null,{label:"parent",sub:"P"});t5c=null;t5Draw();el("t5Note").innerHTML="Goal: <b>parent → child → three grandchildren</b>. Only the <b>child</b> forks the grandchildren.";}
+  function t5Draw(){t5.render(el("t5Svg"),{nodeW:88,colW:100});}
+  function t5ForkChild(){if(t5c){el("t5Note").innerHTML="The child already exists — now fork <b>grandchildren</b> from it (up to three).";return;}t5c=t5.add(t5.root,{label:"child",sub:"C"});t5.nodes[t5c]._new=true;t5Draw();el("t5Note").innerHTML="Child created. Now click <b>“child: fork() a grandchild”</b> three times.";}
+  function t5ForkGrand(){if(!t5c){el("t5Note").innerHTML="Create the <b>child</b> first.";return;}if(t5.nodes[t5c].children.length>=3){el("t5Note").innerHTML="Done — <b>parent → child → 3 grandchildren</b>. Matches the required output.";return;}var id=t5.add(t5c,{label:"grandchild",sub:"GC",leaf:true,pulse:true});t5.nodes[id]._new=true;t5Draw();var n=t5.nodes[t5c].children.length;el("t5Note").innerHTML=n>=3?"Done — <b>parent → child → 3 grandchildren</b>. Matches the required output.":"Grandchild "+n+" of 3 created. Keep going…";}
+
+  /* INSERT_FUNCS */
+  window.ex1Reset=ex1Reset;window.ex1Step=ex1Step;window.ex1RunAll=ex1RunAll;window.ex4Reset=ex4Reset;window.ex4Step=ex4Step;window.t2Reset=t2Reset;window.t2Step=t2Step;window.t5Reset=t5Reset;window.t5ForkChild=t5ForkChild;window.t5ForkGrand=t5ForkGrand;
+  window.peReset=peReset;window.peDo=peDo;window.frRole=frRole;window.rcRun=rcRun;window.rcToggleWait=rcToggleWait;window.psStep=psStep;window.psReset=psReset;
+  window.fpsStep=fpsStep;window.fpsRunAll=fpsRunAll;window.fpsReset=fpsReset;window.memReset=memReset;window.memFork=memFork;window.memParent=memParent;window.memChild=memChild;
+  window.orpReset=orpReset;window.orpStep=orpStep;
+  window.scStep=scStep;window.scReset=scReset;window.ukReset=ukReset;
+  window.flReset=flReset;window.flOpen=flOpen;window.flWrite=flWrite;window.flSeek=flSeek;window.flRead=flRead;window.flClose=flClose;window.flPreset=flPreset;
+  initAll();
+</script>
+</body>
+</html>
