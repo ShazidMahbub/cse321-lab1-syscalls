@@ -132,6 +132,8 @@
   .dv{font-size:14.5px;}
   .doclist{margin:0;padding-left:20px;} .doclist li{margin:4px 0;font-size:14.5px;}
   .docnote{margin-top:12px;font-size:14px;color:var(--tx2);border-left:2px solid var(--acline);padding-left:11px;}
+  .fleffect{font-size:14.5px;color:var(--tx);background:var(--bg2);border:1px solid var(--line);border-left:2px solid var(--cyan);border-radius:8px;padding:11px 14px;min-height:20px;line-height:1.5;}
+  .fleffect b{color:var(--cyan);}
   /* ===== LAB PANELS ===== */
   .sim{border:1px solid var(--line2);border-radius:14px;margin:20px 0;background:var(--surface);overflow:hidden;}
   .sim-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--line2);flex-wrap:wrap;}
@@ -337,7 +339,7 @@ Hello, World!
       <tbody>
         <tr><td><strong>Linux &amp; the shell</strong></td><td><code>pwd</code>, <code>ls</code>, <code>cd</code>, <code>mkdir</code>, <code>gcc</code>, <code>./run</code></td></tr>
         <tr><td><strong>Writing &amp; compiling C</strong></td><td><code>#include</code>, <code>main</code>, <code>printf</code>, <code>gcc</code>, reading compiler errors</td></tr>
-        <tr><td><strong>System calls</strong></td><td>the user / kernel boundary, <code>strace</code></td></tr>
+        <tr><td><strong>System calls</strong></td><td>the user / kernel boundary, mode switching</td></tr>
         <tr><td><strong>File I/O</strong></td><td><code>open</code>, <code>read</code>, <code>write</code>, <code>lseek</code>, <code>close</code>, file descriptors, permissions</td></tr>
         <tr><td><strong>Processes</strong></td><td><code>fork</code>, <code>wait</code>, <code>exec</code>, <code>exit</code>, zombies, orphans</td></tr>
       </tbody>
@@ -462,11 +464,6 @@ Hello, World!
     <h3><span class="hx">?</span>User space or kernel? — click each</h3>
     <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Sort it</span> Which needs a system call</div><button class="btn ghost sm" onclick="ukReset()">Reset</button></div>
       <div class="sim-body"><div class="explorer" id="ukList"></div><p class="stepnote" id="ukNote">Click each operation to reveal whether your program can do it directly, or must ask the kernel via a system call.</p></div></div>
-    <h3><span class="hx">$</span>strace — see the calls a program makes</h3>
-    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Trace</span> strace &lt;program&gt;</div></div>
-      <div class="sim-body"><div class="pickrow" id="straceProg"></div>
-        <div class="console" id="straceOut" style="min-height:140px"></div>
-        <p class="muted" style="font-size:13.5px;margin:11px 0 0">Each line is one system call the program made, with its return value — exactly what <code>strace ./prog</code> shows you in real life.</p></div></div>
   </section>
 
   <!-- 4 FILE I/O -->
@@ -491,6 +488,8 @@ Hello, World!
           <span style="color:var(--tx2);font-size:13px">lseek(</span><input class="field" id="flN" type="number" value="0" /><select class="field" id="flWhence"><option value="SET">SEEK_SET</option><option value="CUR">SEEK_CUR</option><option value="END">SEEK_END</option></select><span style="color:var(--tx2);font-size:13px">)</span><button class="btn ghost" onclick="flSeek()">go</button>
           <button class="btn cyan" onclick="flRead()">read(<input class="field" id="flReadN" type="number" value="5" style="width:46px" />)</button><button class="btn ghost" onclick="flClose()">close</button></div>
         <div class="bytestrip" id="flStrip"></div>
+        <div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin:14px 0 5px">What that call just did</div>
+        <div id="flEffect" class="fleffect"></div>
         <div class="twocol" style="margin-top:14px">
           <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">Generated C</div><div class="genc" id="flGenC"></div></div>
           <div><div class="muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px">fd table &amp; log</div><table class="pidtable" id="fdTable"></table><div class="oplog" id="flLog" style="margin-top:9px"></div></div>
@@ -501,14 +500,10 @@ Hello, World!
           <button class="btn sm cyan" onclick="flPreset('ex3')">Example 3 — the “50 not 90”</button></div>
       </div>
     </div>
-    <h3><span class="hx">+</span><code>open()</code> flags</h3>
-    <p>Returns a non-negative <strong>file descriptor</strong> on success <span class="ret pos">&ge; 0</span>, or <span class="ret neg">-1</span> on failure. <code>mode</code> (e.g. <code>0600</code>) sets permissions, needed only when creating. Toggle these in the lab:</p>
-    <div class="tablewrap"><table><thead><tr><th style="width:30%">Flag</th><th>Meaning</th></tr></thead><tbody>
-      <tr><td><code>O_RDONLY</code></td><td>Open for reading only</td></tr><tr><td><code>O_WRONLY</code></td><td>Open for writing only</td></tr>
-      <tr><td><code>O_RDWR</code></td><td>Open for both reading and writing</td></tr><tr><td><code>O_APPEND</code></td><td>Append new data to the <strong>end</strong> of the file</td></tr>
-      <tr><td><code>O_TRUNC</code></td><td>Clear all existing data first</td></tr><tr><td><code>O_CREAT</code></td><td>Create the file if it does not exist (requires <code>mode</code>)</td></tr>
-      <tr><td><code>O_EXCL</code></td><td>With <code>O_CREAT</code>, fail if the file already exists</td></tr>
-    </tbody></table></div>
+    <h3><span class="hx">+</span><code>open()</code> flags — click each</h3>
+    <p><code>open()</code> returns a non-negative <strong>file descriptor</strong> on success (<span class="ret pos">&ge; 0</span>) or <span class="ret neg">-1</span> on failure. The <code>flags</code> argument is one <em>access mode</em> combined with any <em>options</em> using the bitwise OR (<code>|</code>). Select a flag to see exactly what it does:</p>
+    <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Explore</span> The <code style="background:none;color:inherit;border:0;padding:0">open()</code> flags</div></div>
+      <div class="sim-body"><div class="explorer" id="flagExplorer"></div><div class="explain" id="flagExplain"></div></div></div>
     <h3><span class="hx">rwx</span>Permission (mode) explorer</h3>
     <div class="sim"><div class="sim-head"><div class="sim-title"><span class="tagi">Toggle</span> octal mode &harr; rwx</div></div>
       <div class="sim-body">
@@ -964,7 +959,7 @@ close(fd);</code></pre></div>
     hlAll(document);buildNav();
     nvChips();nvReset();
     termChips();buildProgLoader("hello");codeReset();buildErrExplorer();buildPf();
-    scReset();buildCallExplorer();ukReset();buildStrace();var sp=el("scPick");if(sp&&!sp._b){sp._b=1;sp.addEventListener("change",scReset);}
+    scReset();buildCallExplorer();ukReset();buildFlagExplorer();var sp=el("scPick");if(sp&&!sp._b){sp._b=1;sp.addEventListener("change",scReset);}
     flReset();permReset();
     peReset();frRole("parent");buildFpsPresets();fpsReset();memReset();el("rcOut").innerHTML='<span class="dim">// press Run the program</span>';psReset();buildExecExplorer();
     var fc=el("fpsCode");if(fc&&!fc._b){fc._b=1;fc.addEventListener("input",fpsReset);}
@@ -1016,17 +1011,22 @@ close(fd);</code></pre></div>
     el("callExplain").innerHTML=h;}
   var UK=[{t:"Add two numbers",k:0},{t:"Print to the screen",k:1,c:"write()"},{t:"Open a file",k:1,c:"open()"},{t:"Loop 1000 times",k:0},{t:"Create a process",k:1,c:"fork()"},{t:"Compute a factorial",k:0},{t:"Read keyboard input",k:1,c:"read()"},{t:"Replace the program",k:1,c:"exec()"}];
   function ukReset(){var b=el("ukList");b.innerHTML="";UK.forEach(function(u){var x=document.createElement("button");x.className="pickbtn";x.style.minHeight="58px";x.textContent=u.t;x.onclick=function(){if(x.dataset.d)return;x.dataset.d="1";if(u.k){x.classList.add("on");x.innerHTML=u.t+"<small>kernel · "+u.c+"</small>";}else{x.style.background="var(--greend)";x.style.borderColor="var(--greenl)";x.style.color="var(--green)";x.innerHTML=u.t+"<small>user space · no syscall</small>";}};b.appendChild(x);});el("ukNote").innerHTML="Click each operation to reveal whether your program does it directly, or must ask the kernel.";}
-  var STRACE={hello:["execve(\"./hello\", [\"./hello\"], ...) = 0","write(1, \"Hello, World!\\n\", 14) = 14","exit_group(0) = ?"],
-    filewrite:["execve(\"./writer\", ...) = 0","openat(AT_FDCWD, \"testfile\", O_WRONLY|O_CREAT, 0600) = 3","write(3, \"The quick brown fox...\\n\", 45) = 45","close(3) = 0","exit_group(0) = ?"],
-    fork:["execve(\"./forker\", ...) = 0","fork() = 12473","write(1, \"parent\\n\", 7) = 7","wait4(12473, ...) = 12473","exit_group(0) = ?"]};
-  var STRACE_L={hello:"./hello",filewrite:"./writer (file)",fork:"./forker (fork+wait)"};
-  function buildStrace(){var r=el("straceProg");r.innerHTML="";Object.keys(STRACE).forEach(function(k,i){var b=document.createElement("button");b.className="opt2"+(i===0?" on":"");b.textContent=STRACE_L[k];b.onclick=function(){r.querySelectorAll(".opt2").forEach(function(y){y.classList.remove("on");});b.classList.add("on");straceShow(k);};r.appendChild(b);});straceShow("hello");}
-  function straceShow(k){var o=el("straceOut");o.innerHTML='<div class="dim">$ strace '+(k==="hello"?"./hello":k==="filewrite"?"./writer":"./forker")+'</div>';var t=200;STRACE[k].forEach(function(ln){setTimeout(function(){var d=document.createElement("div");var parts=ln.split(" = ");d.innerHTML='<span class="gn">'+esc(parts[0])+'</span> = <span class="pid">'+esc(parts[1])+'</span>';o.appendChild(d);o.scrollTop=o.scrollHeight;},t);t+=260;});}
+  var FLAGS=[
+    {n:"O_RDONLY",cat:"access mode",d:"Open the file for <strong>reading only</strong>. Any <code>write()</code> on this descriptor fails. This is the default access mode (its value is 0)."},
+    {n:"O_WRONLY",cat:"access mode",d:"Open the file for <strong>writing only</strong>. Any <code>read()</code> on this descriptor fails."},
+    {n:"O_RDWR",cat:"access mode",d:"Open the file for <strong>both reading and writing</strong> through the same descriptor."},
+    {n:"O_CREAT",cat:"option",d:"<strong>Create the file if it does not already exist.</strong> When this flag is used you must pass the third argument, <code>mode</code> (e.g. <code>0644</code>), which sets the permissions of the new file. If the file already exists, it is simply opened."},
+    {n:"O_EXCL",cat:"option",d:"Used together with <code>O_CREAT</code>: the call <strong>fails if the file already exists</strong>. This guarantees <code>open()</code> creates a brand-new file, preventing two programs from racing to create the same one."},
+    {n:"O_TRUNC",cat:"option",d:"If the file already exists and is opened for writing, its contents are <strong>discarded</strong> and its length is reset to 0, so you start with an empty file."},
+    {n:"O_APPEND",cat:"option",d:"Before <strong>every</strong> <code>write()</code>, the offset is automatically moved to the <strong>end</strong> of the file, so new data is always appended and existing data is never overwritten."}
+  ];
+  function buildFlagExplorer(){var b=el("flagExplorer");if(!b)return;b.innerHTML="";FLAGS.forEach(function(f,i){var x=document.createElement("button");x.className="pickbtn"+(i===0?" on":"");x.innerHTML='<span style="font-family:var(--mono);font-size:12.5px">'+f.n+'</span><small>'+f.cat+'</small>';x.onclick=function(){b.querySelectorAll(".pickbtn").forEach(function(y){y.classList.remove("on");});x.classList.add("on");flagShow(f);};b.appendChild(x);});flagShow(FLAGS[0]);}
+  function flagShow(f){el("flagExplain").innerHTML='<div class="docmeta"><span style="color:var(--cfn)">'+f.n+'</span> &nbsp; '+f.cat+'</div><p style="margin:7px 0 0">'+f.d+'</p>'+(f.cat==="access mode"?'<div class="docnote">Exactly one access mode (O_RDONLY, O_WRONLY, or O_RDWR) must be chosen, then combined with any options, e.g. <code>O_WRONLY | O_CREAT | O_APPEND</code>.</div>':'');}
 
   /* ===== S4: file lab + fd table + permissions ===== */
   var FL_FLAGS=["O_RDONLY","O_WRONLY","O_RDWR","O_APPEND","O_TRUNC","O_CREAT","O_EXCL"];
   var FL;
-  function flReset(){FL={open:false,fd:null,bytes:[],offset:0,flags:{O_WRONLY:true,O_CREAT:true},gen:[]};buildFlFlags();el("flMode").value="0600";el("flFdVal").textContent="—";el("flStr").value="Hello, world";el("flN").value="0";el("flReadN").value="5";el("flWhence").value="SET";flStat("—");flRender([]);el("flLog").innerHTML='<div class="dim">// open the file to begin</div>';flGen();fdTable();}
+  function flReset(){FL={open:false,fd:null,bytes:[],offset:0,flags:{O_WRONLY:true,O_CREAT:true},gen:[]};buildFlFlags();el("flMode").value="0600";el("flFdVal").textContent="—";el("flStr").value="Hello, world";el("flN").value="0";el("flReadN").value="5";el("flWhence").value="SET";flStat("—");flRender([]);el("flLog").innerHTML='<div class="dim">// open the file to begin</div>';flGen();fdTable();var fe=el("flEffect");if(fe)fe.innerHTML='<span style="color:var(--tx3)">Choose flags and press <b style="color:var(--tx2)">open()</b> to begin. Each call you run is explained here.</span>';}
   function buildFlFlags(){var b=el("flFlags");b.innerHTML="";FL_FLAGS.forEach(function(f){var x=document.createElement("button");x.className="opt2"+(FL.flags[f]?" on":"");x.textContent=f;x.onclick=function(){if(FL.open)return;FL.flags[f]=!FL.flags[f];x.classList.toggle("on");};b.appendChild(x);});}
   function flStat(r){el("flOff").textContent=FL.offset;el("flSize").textContent=FL.bytes.length;el("flRet").textContent=r;}
   function flLog(cls,t){var l=el("flLog");if(l.querySelector(".dim"))l.innerHTML="";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=t;l.appendChild(d);l.scrollTop=l.scrollHeight;}
@@ -1034,12 +1034,12 @@ close(fd);</code></pre></div>
   function flActive(){return FL_FLAGS.filter(function(f){return FL.flags[f];}).join(" | ")||"0";}
   function fdTable(){var rows="<tr><th>fd</th><th>points to</th></tr><tr><td>0</td><td>stdin (keyboard)</td></tr><tr><td>1</td><td>stdout (screen)</td></tr><tr><td>2</td><td>stderr</td></tr>";if(FL.open)rows+='<tr><td style="color:var(--ac2)">3</td><td style="color:var(--ac2)">testfile</td></tr>';el("fdTable").innerHTML=rows;}
   function flRender(just,readIdx){var st=el("flStrip");st.innerHTML="";var len=Math.max(FL.bytes.length,FL.offset,12);for(var i=0;i<len;i++){var cell=document.createElement("div");cell.className="cell";var ch=FL.bytes[i];if(ch!=null){cell.classList.add("filled");cell.textContent=(ch==="\n")?"↵":(ch===" ")?"·":ch;}else cell.textContent="";if(just&&just.indexOf(i)>=0)cell.classList.add("just");if(readIdx&&readIdx.indexOf(i)>=0)cell.classList.add("readhi");if(i%5===0){var x=document.createElement("span");x.className="idx";x.textContent=i;cell.appendChild(x);}st.appendChild(cell);}var mk=document.createElement("div");mk.className="offmark";mk.style.left=(FL.offset*28+4)+"px";var ol=document.createElement("span");ol.className="ol";ol.textContent="offset "+FL.offset;mk.appendChild(ol);st.appendChild(mk);}
-  function flOpen(){if(FL.open){flLog("dim","already open — close first");return;}FL.open=true;FL.fd=3;FL.bytes=[];FL.offset=0;el("flFdVal").textContent="3";flStat(3);FL.gen=['int fd = open("testfile", '+flActive()+(FL.flags.O_CREAT?(", "+el("flMode").value):"")+");"];flGen();flRender([]);fdTable();flLog("ok",'open("testfile", '+flActive()+") → fd = 3");}
-  function flGuard(){if(!FL.open){flLog("mv","error: file not open — press open() first");return false;}return true;}
-  function flWrite(str){if(!flGuard())return;if(FL.flags.O_RDONLY){flLog("mv","write → -1 (opened O_RDONLY)");flStat(-1);return;}var s=(typeof str==="string")?str:el("flStr").value;var disp=s.replace(/\n/g,"\\n");if(FL.flags.O_APPEND)FL.offset=FL.bytes.length;var just=[];for(var i=0;i<s.length;i++){FL.bytes[FL.offset]=s[i];just.push(FL.offset);FL.offset++;}FL.gen.push('write(fd, "'+disp+'", '+s.length+");");flGen();flRender(just);flStat(s.length);flLog("ok",'write(fd, "'+disp+'", '+s.length+") → "+s.length+" bytes, offset "+FL.offset);}
-  function flSeek(){if(!flGuard())return;var n=parseInt(el("flN").value,10)||0,w=el("flWhence").value,base=w==="SET"?0:w==="CUR"?FL.offset:FL.bytes.length,no=base+n;if(no<0)no=0;FL.offset=no;FL.gen.push("lseek(fd, "+n+", SEEK_"+w+");");flGen();flRender([]);flStat(no);flLog("mv","lseek(fd, "+n+", SEEK_"+w+") → offset = "+no);}
-  function flRead(){if(!flGuard())return;if(FL.flags.O_WRONLY){flLog("mv","read → -1 (opened O_WRONLY)");flStat(-1);return;}var n=parseInt(el("flReadN").value,10)||0,idx=[],got=0;for(var i=0;i<n;i++){if(FL.bytes[FL.offset]!=null){idx.push(FL.offset);got++;}FL.offset++;}FL.gen.push("read(fd, buf, "+n+");");flGen();flRender([],idx);flStat(got);flLog("","read(fd, buf, "+n+") → "+got+" bytes, offset "+FL.offset);}
-  function flClose(){if(!flGuard())return;FL.open=false;FL.fd=null;el("flFdVal").textContent="—";FL.gen.push("close(fd);");flGen();fdTable();flLog("","close(fd) → closed (size "+FL.bytes.length+")");}
+  function flOpen(){if(FL.open){flLog("dim","already open — close first");return;}FL.open=true;FL.fd=3;FL.bytes=[];FL.offset=0;el("flFdVal").textContent="3";flStat(3);FL.gen=['int fd = open("testfile", '+flActive()+(FL.flags.O_CREAT?(", "+el("flMode").value):"")+");"];flGen();flRender([]);fdTable();flLog("ok",'open("testfile", '+flActive()+") → fd = 3");el("flEffect").innerHTML="<b>open()</b> opened the file and returned <b>file descriptor 3</b>, with the read/write offset at byte 0. Every later read, write, lseek and close refers to the file through this descriptor."+(FL.flags.O_TRUNC?" <code>O_TRUNC</code> cleared any existing contents.":"");}
+  function flGuard(){if(!FL.open){flLog("mv","error: file not open — press open() first");var fe=el("flEffect");if(fe)fe.innerHTML="The file is not open yet. Press <b>open()</b> first to obtain a file descriptor.";return false;}return true;}
+  function flWrite(str){if(!flGuard())return;if(FL.flags.O_RDONLY){flLog("mv","write → -1 (opened O_RDONLY)");flStat(-1);el("flEffect").innerHTML="<b>write()</b> returned <b>-1</b>: the file was opened <code>O_RDONLY</code>, so writing is not permitted.";return;}var s=(typeof str==="string")?str:el("flStr").value;var disp=s.replace(/\n/g,"\\n");var app=false;if(FL.flags.O_APPEND){FL.offset=FL.bytes.length;app=true;}var just=[];for(var i=0;i<s.length;i++){FL.bytes[FL.offset]=s[i];just.push(FL.offset);FL.offset++;}FL.gen.push('write(fd, "'+disp+'", '+s.length+");");flGen();flRender(just);flStat(s.length);flLog("ok",'write(fd, "'+disp+'", '+s.length+") → "+s.length+" bytes, offset "+FL.offset);el("flEffect").innerHTML="<b>write()</b> copied <b>"+s.length+"</b> byte"+(s.length===1?"":"s")+" from your buffer into the file"+(app?" at the <b>end</b> (O_APPEND moved the offset there first)":" starting at the current offset")+", then advanced the offset to <b>"+FL.offset+"</b>.";}
+  function flSeek(){if(!flGuard())return;var n=parseInt(el("flN").value,10)||0,w=el("flWhence").value,base=w==="SET"?0:w==="CUR"?FL.offset:FL.bytes.length,no=base+n;if(no<0)no=0;FL.offset=no;FL.gen.push("lseek(fd, "+n+", SEEK_"+w+");");flGen();flRender([]);flStat(no);flLog("mv","lseek(fd, "+n+", SEEK_"+w+") → offset = "+no);el("flEffect").innerHTML="<b>lseek()</b> moved the read/write offset to byte <b>"+no+"</b> without transferring any data. The next read or write begins from there.";}
+  function flRead(){if(!flGuard())return;if(FL.flags.O_WRONLY){flLog("mv","read → -1 (opened O_WRONLY)");flStat(-1);el("flEffect").innerHTML="<b>read()</b> returned <b>-1</b>: the file was opened <code>O_WRONLY</code>, so reading is not permitted.";return;}var n=parseInt(el("flReadN").value,10)||0,idx=[],got=0;for(var i=0;i<n;i++){if(FL.bytes[FL.offset]!=null){idx.push(FL.offset);got++;}FL.offset++;}FL.gen.push("read(fd, buf, "+n+");");flGen();flRender([],idx);flStat(got);flLog("","read(fd, buf, "+n+") → "+got+" bytes, offset "+FL.offset);el("flEffect").innerHTML="<b>read()</b> copied <b>"+got+"</b> byte"+(got===1?"":"s")+" from the file (starting at the offset) into your buffer, and advanced the offset to <b>"+FL.offset+"</b>.";}
+  function flClose(){if(!flGuard())return;FL.open=false;FL.fd=null;el("flFdVal").textContent="—";FL.gen.push("close(fd);");flGen();fdTable();flLog("","close(fd) → closed (size "+FL.bytes.length+")");el("flEffect").innerHTML="<b>close()</b> released file descriptor 3. It no longer refers to the file, and the number can be reused by a later <code>open()</code>.";}
   function flPreset(w){flReset();if(w==="together"){FL.flags={O_RDWR:true};buildFlFlags();flPlay([function(){flOpen();},function(){el("flStr").value="Hello, world";flWrite("Hello, world");},function(){el("flN").value="0";el("flWhence").value="SET";flSeek();},function(){el("flReadN").value="12";flRead();},function(){flClose();}]);}
     else if(w==="ex2"){FL.flags={O_WRONLY:true,O_CREAT:true};buildFlFlags();var s="The quick brown fox jumps over the lazy dog.\n";flPlay([function(){flOpen();},function(){el("flStr").value=s;flWrite(s);},function(){flClose();}]);}
     else if(w==="ex3"){FL.flags={O_WRONLY:true,O_CREAT:true};buildFlFlags();var t="The quick brown fox jumps over the lazy dog.\n";flPlay([function(){flOpen();},function(){el("flStr").value=t;flWrite(t);flLog("ok","1st write → 45 bytes (0..44)");},function(){el("flN").value="5";el("flWhence").value="SET";flSeek();},function(){el("flStr").value=t;flWrite(t);flLog("ok","2nd write → overwrites 5..44, extends to 49");},function(){flClose();flLog("mv","► final size = "+FL.bytes.length+" bytes (not 90)");}]);}}
