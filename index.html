@@ -598,7 +598,7 @@ if (n &lt; 0) perror("read");</code></pre></div>
     <div class="doccard">
       <div class="dch"><span class="dcn">write()</span><span class="dcp">copy bytes from your buffer into the file</span></div>
       <div class="docsig">ssize_t write(int fd, const void *buf, size_t count);</div>
-      <p>Copies up to <code>count</code> bytes from <code>buf</code> to the file at the current offset, then advances the offset by the number written. For a regular file it normally writes all <code>count</code> bytes. If the file was opened with <code>O_APPEND</code>, the offset jumps to the <strong>end</strong> of the file before every write, so data is always appended and nothing is overwritten.</p>
+      <p>Copies up to <code>count</code> bytes from <code>buf</code> to the file at the current offset, then advances the offset by the number written. For a regular file it usually writes all <code>count</code> bytes, but you should still check the return value, since fewer may be written. If the file was opened with <code>O_APPEND</code>, the offset jumps to the <strong>end</strong> of the file before every write, so data is always appended and nothing is overwritten.</p>
       <div class="twocol">
         <div class="docrow"><span class="dk">Parameters</span><ul class="doclist"><li><code>fd</code> — a descriptor open for writing</li><li><code>buf</code> — the data to write</li><li><code>count</code> — how many bytes to write</li></ul></div>
         <div class="docrow"><span class="dk">Returns</span><div class="dv">The number of bytes written, or <span class="ret neg">-1</span> on error.</div></div>
@@ -616,7 +616,7 @@ ssize_t n = write(fd, msg, strlen(msg));  /* writes 6 bytes; offset advances by 
       <div class="tablewrap" style="margin-top:9px"><table><thead><tr><th style="width:21%">whence</th><th>Counts from</th><th>Example on a 10-byte file</th></tr></thead><tbody>
         <tr><td><code>SEEK_SET</code></td><td>the <strong>start</strong> of the file (byte 0)</td><td><code>lseek(fd, 3, SEEK_SET)</code> &rarr; offset <strong>3</strong></td></tr>
         <tr><td><code>SEEK_CUR</code></td><td>the <strong>current</strong> offset</td><td>at byte 4: <code>lseek(fd, 2, SEEK_CUR)</code> &rarr; <strong>6</strong>; &nbsp; <code>lseek(fd, -2, SEEK_CUR)</code> &rarr; <strong>2</strong></td></tr>
-        <tr><td><code>SEEK_END</code></td><td>the <strong>end</strong> of the file (byte 10)</td><td><code>lseek(fd, 0, SEEK_END)</code> &rarr; <strong>10</strong>; &nbsp; <code>lseek(fd, -3, SEEK_END)</code> &rarr; <strong>7</strong></td></tr>
+        <tr><td><code>SEEK_END</code></td><td>the <strong>end</strong> of the file (offset 10, just past the last byte)</td><td><code>lseek(fd, 0, SEEK_END)</code> &rarr; <strong>10</strong>; &nbsp; <code>lseek(fd, -3, SEEK_END)</code> &rarr; <strong>7</strong></td></tr>
       </tbody></table></div>
       <p class="muted" style="font-size:13.5px">Because it returns the new offset, <code>lseek(fd, 0, SEEK_END)</code> is the usual way to ask &ldquo;how many bytes is this file?&rdquo; Drive each of these in the <a href="#" onclick="go(4);el('flStrip').scrollIntoView({block:'center'});return false;">File descriptor lab</a> above using the <code>SEEK_SET / SEEK_CUR / SEEK_END</code> dropdown.</p>
     </div>
